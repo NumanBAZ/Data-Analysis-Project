@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { DollarSign, Package, PieChart as PieIcon, ShoppingCart, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Package, PieChart as PieIcon, ShoppingCart, X } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { brandKey } from '@/core/brands'
 import { formatDateTR, shortDateTR } from '@/core/dates'
@@ -22,8 +22,6 @@ import { ExportMenu } from '@/components/export-menu'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { PrintHeader } from '@/components/print-header'
-import { Segmented } from '@/components/segmented'
-import { SORT_BY_OPTIONS, type SortBy } from '@/lib/sort'
 import { ProductImage } from '@/components/product-image'
 import { Search } from '@/components/search'
 import { StatCard } from '@/components/stat-card'
@@ -34,6 +32,34 @@ import { ChangesCard } from '@/features/dashboard/components/insights'
 const SLICES = 7
 const OTHER = 'Diğer'
 const colorAt = (i: number) => (i < SLICES ? `var(--cat-${i + 1})` : 'var(--cat-other)')
+
+type SortKey = 'price' | 'sales' | 'revenue'
+const SORT_VALUE: Record<SortKey, (p: Product) => number | null> = {
+  price: (p) => p.price,
+  sales: (p) => p.salesAdjusted,
+  revenue: (p) => p.revenueCalc,
+}
+
+/** Tıklanınca sıralayan tablo başlığı; ok yönü sıralama yönünü gösterir */
+function SortHead({ label, k, sort, onClick }: {
+  label: string
+  k: SortKey
+  sort: { key: SortKey; dir: 'desc' | 'asc' }
+  onClick: (k: SortKey) => void
+}) {
+  const active = sort.key === k
+  const Icon = !active ? ArrowUpDown : sort.dir === 'desc' ? ArrowDown : ArrowUp
+  return (
+    <TableHead className='text-right'>
+      <button type='button' onClick={() => onClick(k)}
+        title={active && sort.dir === 'desc' ? 'Azdan çoğa sırala' : 'Çoktan aza sırala'}
+        className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted', active ? 'text-foreground' : 'text-muted-foreground')}>
+        {label}
+        <Icon className='size-3.5' />
+      </button>
+    </TableHead>
+  )
+}
 
 /** Her firmanın verilen tarihteki (ya da ondan önceki en yakın) raporu */
 function reportsAt(all: Report[], date: string): Report[] {
@@ -108,9 +134,23 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
   }))
 
   const activeCat = category && colorOf.has(category) ? category : undefined
-  const [topBy, setTopBy] = useState<SortBy>('revenue')
-  const topKey = (p: Product) => (topBy === 'revenue' ? p.revenueCalc || 0 : p.salesAdjusted || 0)
-  const top = [...byCategory(products, activeCat)].sort((a, b) => topKey(b) - topKey(a)).slice(0, 15)
+  // Ürün tablosu: Fiyat / Satış / Ciro başlığına tıklayınca çoktan aza, tekrar tıklayınca azdan çoğa
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'desc' | 'asc' }>({ key: 'revenue', dir: 'desc' })
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }))
+  const top = useMemo(() => {
+    const v = SORT_VALUE[sort.key]
+    const sign = sort.dir === 'desc' ? -1 : 1
+    // Değeri boş olan ürünler her iki yönde de en alta
+    return [...byCategory(products, activeCat)]
+      .sort((a, b) => {
+        const x = v(a)
+        const y = v(b)
+        if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1
+        return sign * (x - y)
+      })
+      .slice(0, 20)
+  }, [products, activeCat, sort])
   const prevByAsin = useMemo(() => new Map(prevProducts.map((p) => [p.asin, p])), [prevProducts])
   const pickCat = (c?: string) => setCategory(c && c !== OTHER && c !== activeCat ? c : undefined)
 
@@ -257,14 +297,13 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
 
             <Card>
               <CardHeader className='flex flex-row flex-wrap items-center gap-2'>
-                <CardTitle className='me-auto'>En çok satan ürünler</CardTitle>
+                <CardTitle className='me-auto'>Ürünler</CardTitle>
                 {activeCat && (
                   <Button variant='secondary' size='sm' onClick={() => setCategory(undefined)}>
                     <span className='size-2.5 rounded-sm' style={{ background: colorOf.get(activeCat) }} />
                     {activeCat} <X />
                   </Button>
                 )}
-                <Segmented value={topBy} onChange={setTopBy} options={SORT_BY_OPTIONS} />
               </CardHeader>
               <CardContent>
                 <Table>
@@ -272,10 +311,10 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                     <TableRow>
                       <TableHead className='w-12' />
                       <TableHead>Ürün</TableHead>
-                      <TableHead className='text-right'>Fiyat</TableHead>
-                      <TableHead className='text-right'>Satış</TableHead>
-                      <TableHead className='text-right'>Ciro</TableHead>
-                      <TableHead className='text-right'>Değişim</TableHead>
+                      <SortHead label='Fiyat' k='price' sort={sort} onClick={toggleSort} />
+                      <SortHead label='Satış' k='sales' sort={sort} onClick={toggleSort} />
+                      <SortHead label='Ciro' k='revenue' sort={sort} onClick={toggleSort} />
+                      {prev && <TableHead className='text-right' title={`${formatDateTR(prev.date)} raporuna göre ciro değişimi`}>Ciro değişimi</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -289,18 +328,20 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                             <Link to='/urun/$asin' params={{ asin: p.asin }} className='block truncate font-medium hover:underline' title={p.title}>{p.title || p.asin}</Link>
                             <span className='text-xs text-muted-foreground'>{p.category}</span>
                           </TableCell>
-                          <TableCell className='text-right tabular-nums'>{fmt.money2(p.price)}</TableCell>
-                          <TableCell className={cn('text-right tabular-nums', topBy === 'sales' && 'font-medium')}>{fmt.int(p.salesAdjusted)}</TableCell>
-                          <TableCell className={cn('text-right tabular-nums', topBy === 'revenue' && 'font-medium')}>{fmt.money(p.revenueCalc)}</TableCell>
-                          <TableCell className={cn('text-right tabular-nums',
-                            d === null ? 'text-muted-foreground' : d >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                            {d === null ? (prev && !o ? 'yeni' : '–') : fmt.delta(d)}
-                          </TableCell>
+                          <TableCell className={cn('text-right tabular-nums', sort.key === 'price' && 'font-medium')}>{fmt.money2(p.price)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums', sort.key === 'sales' && 'font-medium')}>{fmt.int(p.salesAdjusted)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums', sort.key === 'revenue' && 'font-medium')}>{fmt.money(p.revenueCalc)}</TableCell>
+                          {prev && (
+                            <TableCell className={cn('text-right tabular-nums',
+                              d === null ? 'text-muted-foreground' : d >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                              {d === null ? (o ? '–' : 'yeni') : fmt.delta(d)}
+                            </TableCell>
+                          )}
                         </TableRow>
                       )
                     })}
                     {!top.length && (
-                      <TableRow><TableCell colSpan={6} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={prev ? 6 : 5} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
