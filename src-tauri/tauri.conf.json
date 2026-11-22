@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Rakip Analizi",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.benasse.admin-orijinal",
   "build": {
     "frontendDist": "../dist",
