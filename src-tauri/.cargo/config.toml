@@ -1,0 +1,3 @@
+[build]
+# Derleme çıktısı proje dışında: Vite izleyicisi kilitli .exe dosyalarına takılmasın
+target-dir = "../../.cargo-target/admin-orijinal"
