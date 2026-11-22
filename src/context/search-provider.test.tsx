@@ -3,7 +3,7 @@ import { render, type RenderResult } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { SearchProvider } from '@/context/search-provider'
 
-const COMMAND_MENU_PLACEHOLDER = 'Type a command or search...'
+const COMMAND_MENU_PLACEHOLDER = 'Sayfa ara...'
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -69,10 +69,10 @@ describe('SearchProvider and CommandMenu', () => {
     await expect
       .element(getByPlaceholder(COMMAND_MENU_PLACEHOLDER))
       .toBeInTheDocument()
-    await expect.element(getByText('Theme')).toBeInTheDocument()
-    await expect.element(getByText('Light')).toBeInTheDocument()
-    await expect.element(getByText('Dark')).toBeInTheDocument()
-    await expect.element(getByText('System')).toBeInTheDocument()
+    await expect.element(getByText('Tema')).toBeInTheDocument()
+    await expect.element(getByText('Açık')).toBeInTheDocument()
+    await expect.element(getByText('Koyu')).toBeInTheDocument()
+    await expect.element(getByText('Sistem')).toBeInTheDocument()
     await expect.element(getByText('Dashboard')).toBeInTheDocument()
   })
 
@@ -117,26 +117,12 @@ describe('SearchProvider and CommandMenu', () => {
       .not.toBeInTheDocument()
   })
 
-  it('navigates for nested sidebar items (group with sub-items)', async () => {
-    const screen = await renderWithSearchProvider()
-    const { getByPlaceholder, getByRole } = screen
-
-    await openCommandPalette(screen)
-
-    await userEvent.click(getByRole('option', { name: 'Settings Appearance' }))
-
-    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/settings/appearance' })
-    await expect
-      .element(getByPlaceholder(COMMAND_MENU_PLACEHOLDER))
-      .not.toBeInTheDocument()
-  })
-
   it('applies theme and closes the palette when a theme command is chosen', async () => {
     const screen = await renderWithSearchProvider()
 
     await openCommandPalette(screen)
 
-    await userEvent.click(screen.getByText('Dark'))
+    await userEvent.click(screen.getByText('Koyu'))
 
     expect(mocks.setTheme).toHaveBeenCalledWith('dark')
     await expect
@@ -155,7 +141,7 @@ describe('SearchProvider and CommandMenu', () => {
     )
 
     await expect
-      .element(screen.getByText('No results found.'))
+      .element(screen.getByText('Sonuç yok.'))
       .toBeInTheDocument()
   })
 })

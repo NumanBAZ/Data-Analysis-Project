@@ -82,6 +82,8 @@ describe('tarih tanıma', () => {
     ['31Ağu25', '2025-08-31'],
     ['2026-03-09 export.csv', '2026-03-09'],
     ['09.03.2026.xlsx', '2026-03-09'],
+    ['Top 100 urun 5 Ocak 2026.xlsx', '2026-01-05'],
+    ['Kraken 12 products 3 mart 26', '2026-03-03'],
   ])('%s -> %s', (s, d) => expect(guessDate(s)?.date).toBe(d))
 
   it('yılsız tarihte yıl tahmin edildiği belirtilir', () => {

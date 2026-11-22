@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertTriangle, CircleX, Info, Loader2, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { brandKey, KNOWN_BRANDS } from '@/core/brands'
+import { createBrandResolver, KNOWN_BRANDS } from '@/core/brands'
 import { applyRules, computeTotals } from '@/core/clean'
 import { DEFAULT_SETTINGS, type CleanIssue, type Report } from '@/core/types'
 import { db, getSettings } from '@/data/db'
@@ -34,11 +34,10 @@ import {
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Dropzone } from './dropzone'
-import { draftKey, useUploadStore, type Draft } from './store'
+import { useUploadStore, type Draft } from './store'
 
 const NO_REPORTS: Report[] = []
 const ICON = { error: CircleX, warning: AlertTriangle, info: Info }
@@ -50,6 +49,10 @@ export function Upload() {
   const settings = useLiveQuery(getSettings) ?? DEFAULT_SETTINGS
   const reports = useLiveQuery(() => db.reports.toArray()) ?? NO_REPORTS
   const existing = useMemo(() => new Map(reports.map((r) => [`${r.date}|${r.brandKey}`, r])), [reports])
+  // Kayıttaki anahtarla aynı: takma adlar (ör. LotusBond) ana firmaya (Kraken) iner
+  const resolveBrand = useMemo(() => createBrandResolver(settings.aliases), [settings.aliases])
+  const companyKey = (brand: string) => resolveBrand(brand.trim()).key
+  const draftKey = (d: Draft) => `${d.date}|${companyKey(d.brand)}`
 
   const brandOptions = useMemo(
     () => [...new Set<string>([...KNOWN_BRANDS, ...reports.map((r) => r.brand)])].sort((a, b) => a.localeCompare(b, 'tr')),
@@ -105,7 +108,6 @@ export function Upload() {
         <Search className='me-auto' />
         <ThemeSwitch />
         <ConfigDrawer />
-        <ProfileDropdown />
       </Header>
 
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
@@ -171,6 +173,7 @@ export function Upload() {
                         draft={d}
                         listId='brand-options'
                         replaces={existing.get(draftKey(d))}
+                        companyKey={companyKey(d.brand)}
                         rule={settings.rule}
                         onChange={(p) => update(d.id, p)}
                         onRemove={() => remove(d.id)}
@@ -204,6 +207,7 @@ function DraftRow({
   draft,
   listId,
   replaces,
+  companyKey,
   rule,
   onChange,
   onRemove,
@@ -211,13 +215,14 @@ function DraftRow({
   draft: Draft
   listId: string
   replaces?: Report
+  companyKey: string
   rule: typeof DEFAULT_SETTINGS.rule
   onChange: (p: Partial<Pick<Draft, 'brand' | 'date' | 'include'>>) => void
   onRemove: () => void
 }) {
   const totals = useMemo(
-    () => computeTotals(applyRules(draft.products, brandKey(draft.brand), rule).products),
-    [draft.products, draft.brand, rule]
+    () => computeTotals(applyRules(draft.products, companyKey, rule).products),
+    [draft.products, companyKey, rule]
   )
   return (
     <TableRow data-state={draft.include ? undefined : 'disabled'} className={draft.include ? '' : 'opacity-50'}>

@@ -9,11 +9,11 @@ import {
 import type { CategoryEntry, Product, Report, Settings } from '@/core/types'
 import { db } from './db'
 
-export async function loadCategoryLookup(): Promise<(asin: string) => string | undefined> {
+export async function loadCategoryMap(): Promise<Map<string, string>> {
   const all = await db.categories.toArray()
-  const map = new Map(all.map((c) => [c.asin, c.category]))
-  return (asin) => map.get(asin)
+  return new Map(all.map((c) => [c.asin, c.category]))
 }
+
 
 export async function findExistingReport(date: string, key: string) {
   return db.reports.where('[date+brandKey]').equals([date, key]).first()
@@ -52,7 +52,11 @@ export async function saveSheet(sheet: ParsedSheet, opts: SaveOptions): Promise<
   const resolved = createBrandResolver(opts.settings.aliases)(opts.brand)
   if (resolved.known) opts = { ...opts, brand: resolved.brand }
   const key = brandKey(opts.brand)
-  const { products } = applyRules(applyTitleRulesTo(opts.products ?? sheet.products), key, opts.settings.rule)
+  // Taslaktaki bütün ürünler tek firmanındır; firma adı yüklemede elle değiştirildiyse ürünlere de yansır
+  const drafts = (opts.products ?? sheet.products).map((p) =>
+    p.brand === opts.brand && p.brandKey === key ? p : { ...p, brand: opts.brand, brandKey: key }
+  )
+  const { products } = applyRules(applyTitleRulesTo(drafts), key, opts.settings.rule)
   const report: Report = {
     name: sheet.sheetName && sheet.sheetName !== 'Sheet1'
       ? `${sheet.fileName} / ${sheet.sheetName}`
@@ -73,12 +77,15 @@ export async function saveSheet(sheet: ParsedSheet, opts: SaveOptions): Promise<
   }
 
   const now = new Date().toISOString()
+  const asins = new Set(products.map((p) => p.asin))
   const images = [...(sheet.images ?? [])]
-    .filter(([asin]) => products.some((p) => p.asin === asin))
+    .filter(([asin]) => asins.has(asin))
     .map(([asin, img]) => ({ asin, data: new Blob([img.data as BlobPart], { type: img.type }), type: img.type, updatedAt: now }))
 
   return db.transaction('rw', [db.reports, db.products, db.categories, db.images], async () => {
-    if (opts.replaceId) await deleteReport(opts.replaceId)
+    // Aynı firma + tarih için kayıt varsa onun yerine geçer (firma adı takma adla yazılmış olsa bile)
+    const replaceId = opts.replaceId ?? (await findExistingReport(opts.date, key))?.id
+    if (replaceId) await deleteReport(replaceId)
     const id = (await db.reports.add(report)) as number
     await db.products.bulkAdd(products.map((p) => ({ ...p, reportId: id })))
     await learnCategories(products, key)
@@ -165,7 +172,8 @@ export async function updateProduct(id: number, field: EditableField, value: str
     const price = field === 'price' ? (value as number | null) : p.price
     const sales = field === 'salesAdjusted' ? (value as number | null) : p.salesAdjusted
     if (field === 'price' || field === 'salesAdjusted') {
-      patch.revenueCalc = price !== null && sales !== null ? price * sales : 0
+      // Yüklemedeki kuralla aynı: fiyat veya satış yoksa dosyadaki ham ciro
+      patch.revenueCalc = price !== null && sales !== null ? price * sales : (p.revenue ?? 0)
     }
     const firstEdit = p.edits?.[field]
     patch.edits = { ...(p.edits ?? {}), [field]: firstEdit ?? { from: old, at: new Date().toISOString() } }

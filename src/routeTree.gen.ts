@@ -13,14 +13,12 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
-import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedYukleIndexRouteImport } from './routes/_authenticated/yukle/index'
 import { Route as AuthenticatedYedekIndexRouteImport } from './routes/_authenticated/yedek/index'
-import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedRaporlarIndexRouteImport } from './routes/_authenticated/raporlar/index'
 import { Route as AuthenticatedKategorilerIndexRouteImport } from './routes/_authenticated/kategoriler/index'
 import { Route as AuthenticatedKarsilastirIndexRouteImport } from './routes/_authenticated/karsilastir/index'
-import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
+import { Route as AuthenticatedFirmaIndexRouteImport } from './routes/_authenticated/firma/index'
 import { Route as AuthenticatedUrunAsinIndexRouteImport } from './routes/_authenticated/urun/$asin/index'
 import { Route as AuthenticatedRaporlarIdIndexRouteImport } from './routes/_authenticated/raporlar/$id/index'
 
@@ -43,12 +41,6 @@ const errors404Route = errors404RouteImport.update({
   path: '/404',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedSettingsRouteRoute =
-  AuthenticatedSettingsRouteRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedYukleIndexRoute = AuthenticatedYukleIndexRouteImport.update({
   id: '/yukle/',
   path: '/yukle/',
@@ -59,12 +51,6 @@ const AuthenticatedYedekIndexRoute = AuthenticatedYedekIndexRouteImport.update({
   path: '/yedek/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedSettingsIndexRoute =
-  AuthenticatedSettingsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any)
 const AuthenticatedRaporlarIndexRoute =
   AuthenticatedRaporlarIndexRouteImport.update({
     id: '/raporlar/',
@@ -83,12 +69,11 @@ const AuthenticatedKarsilastirIndexRoute =
     path: '/karsilastir/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedSettingsAppearanceRoute =
-  AuthenticatedSettingsAppearanceRouteImport.update({
-    id: '/appearance',
-    path: '/appearance',
-    getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any)
+const AuthenticatedFirmaIndexRoute = AuthenticatedFirmaIndexRouteImport.update({
+  id: '/firma/',
+  path: '/firma/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedUrunAsinIndexRoute =
   AuthenticatedUrunAsinIndexRouteImport.update({
     id: '/urun/$asin/',
@@ -104,14 +89,12 @@ const AuthenticatedRaporlarIdIndexRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
-  '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/404': typeof errors404Route
   '/500': typeof errors500Route
-  '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/firma/': typeof AuthenticatedFirmaIndexRoute
   '/karsilastir/': typeof AuthenticatedKarsilastirIndexRoute
   '/kategoriler/': typeof AuthenticatedKategorilerIndexRoute
   '/raporlar/': typeof AuthenticatedRaporlarIndexRoute
-  '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/yedek/': typeof AuthenticatedYedekIndexRoute
   '/yukle/': typeof AuthenticatedYukleIndexRoute
   '/raporlar/$id/': typeof AuthenticatedRaporlarIdIndexRoute
@@ -121,11 +104,10 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/': typeof AuthenticatedIndexRoute
-  '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/firma': typeof AuthenticatedFirmaIndexRoute
   '/karsilastir': typeof AuthenticatedKarsilastirIndexRoute
   '/kategoriler': typeof AuthenticatedKategorilerIndexRoute
   '/raporlar': typeof AuthenticatedRaporlarIndexRoute
-  '/settings': typeof AuthenticatedSettingsIndexRoute
   '/yedek': typeof AuthenticatedYedekIndexRoute
   '/yukle': typeof AuthenticatedYukleIndexRoute
   '/raporlar/$id': typeof AuthenticatedRaporlarIdIndexRoute
@@ -134,15 +116,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/_authenticated/firma/': typeof AuthenticatedFirmaIndexRoute
   '/_authenticated/karsilastir/': typeof AuthenticatedKarsilastirIndexRoute
   '/_authenticated/kategoriler/': typeof AuthenticatedKategorilerIndexRoute
   '/_authenticated/raporlar/': typeof AuthenticatedRaporlarIndexRoute
-  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/yedek/': typeof AuthenticatedYedekIndexRoute
   '/_authenticated/yukle/': typeof AuthenticatedYukleIndexRoute
   '/_authenticated/raporlar/$id/': typeof AuthenticatedRaporlarIdIndexRoute
@@ -152,14 +132,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/settings'
     | '/404'
     | '/500'
-    | '/settings/appearance'
+    | '/firma/'
     | '/karsilastir/'
     | '/kategoriler/'
     | '/raporlar/'
-    | '/settings/'
     | '/yedek/'
     | '/yukle/'
     | '/raporlar/$id/'
@@ -169,11 +147,10 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/'
-    | '/settings/appearance'
+    | '/firma'
     | '/karsilastir'
     | '/kategoriler'
     | '/raporlar'
-    | '/settings'
     | '/yedek'
     | '/yukle'
     | '/raporlar/$id'
@@ -181,15 +158,13 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
-    | '/_authenticated/settings'
     | '/(errors)/404'
     | '/(errors)/500'
     | '/_authenticated/'
-    | '/_authenticated/settings/appearance'
+    | '/_authenticated/firma/'
     | '/_authenticated/karsilastir/'
     | '/_authenticated/kategoriler/'
     | '/_authenticated/raporlar/'
-    | '/_authenticated/settings/'
     | '/_authenticated/yedek/'
     | '/_authenticated/yukle/'
     | '/_authenticated/raporlar/$id/'
@@ -232,13 +207,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof errors404RouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/yukle/': {
       id: '/_authenticated/yukle/'
       path: '/yukle'
@@ -252,13 +220,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/yedek/'
       preLoaderRoute: typeof AuthenticatedYedekIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/settings/': {
-      id: '/_authenticated/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
-      parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
     '/_authenticated/raporlar/': {
       id: '/_authenticated/raporlar/'
@@ -281,12 +242,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKarsilastirIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/settings/appearance': {
-      id: '/_authenticated/settings/appearance'
-      path: '/appearance'
-      fullPath: '/settings/appearance'
-      preLoaderRoute: typeof AuthenticatedSettingsAppearanceRouteImport
-      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    '/_authenticated/firma/': {
+      id: '/_authenticated/firma/'
+      path: '/firma'
+      fullPath: '/firma/'
+      preLoaderRoute: typeof AuthenticatedFirmaIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/urun/$asin/': {
       id: '/_authenticated/urun/$asin/'
@@ -305,25 +266,9 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedSettingsRouteRouteChildren {
-  AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
-  AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
-}
-
-const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
-  {
-    AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
-    AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
-  }
-
-const AuthenticatedSettingsRouteRouteWithChildren =
-  AuthenticatedSettingsRouteRoute._addFileChildren(
-    AuthenticatedSettingsRouteRouteChildren,
-  )
-
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedFirmaIndexRoute: typeof AuthenticatedFirmaIndexRoute
   AuthenticatedKarsilastirIndexRoute: typeof AuthenticatedKarsilastirIndexRoute
   AuthenticatedKategorilerIndexRoute: typeof AuthenticatedKategorilerIndexRoute
   AuthenticatedRaporlarIndexRoute: typeof AuthenticatedRaporlarIndexRoute
@@ -334,8 +279,8 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedFirmaIndexRoute: AuthenticatedFirmaIndexRoute,
   AuthenticatedKarsilastirIndexRoute: AuthenticatedKarsilastirIndexRoute,
   AuthenticatedKategorilerIndexRoute: AuthenticatedKategorilerIndexRoute,
   AuthenticatedRaporlarIndexRoute: AuthenticatedRaporlarIndexRoute,

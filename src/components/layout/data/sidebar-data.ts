@@ -5,46 +5,24 @@ import {
   GitCompareArrows,
   DatabaseBackup,
   LayoutDashboard,
-  Palette,
-  Settings,
-  UserCog,
-  AudioWaveform,
-  Command,
-  GalleryVerticalEnd,
+  ChartPie,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
-  user: {
-    name: 'satnaing',
-    email: 'satnaingdev@gmail.com',
-    avatar: '/avatars/shadcn.jpg',
-  },
-  teams: [
-    {
-      name: 'Shadcn Admin',
-      logo: Command,
-      plan: 'Vite + ShadcnUI',
-    },
-    {
-      name: 'Acme Inc',
-      logo: GalleryVerticalEnd,
-      plan: 'Enterprise',
-    },
-    {
-      name: 'Acme Corp.',
-      logo: AudioWaveform,
-      plan: 'Startup',
-    },
-  ],
   navGroups: [
     {
-      title: 'General',
+      title: 'Menü',
       items: [
         {
           title: 'Dashboard',
           url: '/',
           icon: LayoutDashboard,
+        },
+        {
+          title: 'Firma Analizi',
+          url: '/firma',
+          icon: ChartPie,
         },
         {
           title: 'Dosya Yükle',
@@ -70,27 +48,6 @@ export const sidebarData: SidebarData = {
           title: 'Yedekleme',
           url: '/yedek',
           icon: DatabaseBackup,
-        },
-      ],
-    },
-    {
-      title: 'Other',
-      items: [
-        {
-          title: 'Settings',
-          icon: Settings,
-          items: [
-            {
-              title: 'Profile',
-              url: '/settings',
-              icon: UserCog,
-            },
-            {
-              title: 'Appearance',
-              url: '/settings/appearance',
-              icon: Palette,
-            },
-          ],
         },
       ],
     },

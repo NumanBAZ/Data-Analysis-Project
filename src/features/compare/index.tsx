@@ -25,7 +25,6 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { PrintHeader } from '@/components/print-header'
 import { ProductImage } from '@/components/product-image'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { BrandBadge } from '@/components/brand-badge'
@@ -38,6 +37,26 @@ const COLOR_A = 'var(--chart-2)'
 const COLOR_B = 'var(--chart-1)'
 
 const sortTR = (x: string, y: string) => x.localeCompare(y, 'tr')
+
+/**
+ * ASIN'e göre gruplar. Aynı ASIN raporda birden çok satırda geçerse satış ve ciro toplanır
+ * (yoksa biri kaybolur ve fark eksik çıkar). ASIN'i olmayan ürünler ada göre eşleşir.
+ */
+function byAsin(products: Product[]): Map<string, Product> {
+  const m = new Map<string, Product>()
+  for (const p of products) {
+    const key = p.asin || `ad:${p.title}`
+    const prev = m.get(key)
+    if (!prev) m.set(key, p)
+    else
+      m.set(key, {
+        ...prev,
+        salesAdjusted: prev.salesAdjusted === null && p.salesAdjusted === null ? null : (prev.salesAdjusted ?? 0) + (p.salesAdjusted ?? 0),
+        revenueCalc: (prev.revenueCalc || 0) + (p.revenueCalc || 0),
+      })
+  }
+  return m
+}
 
 export function Compare() {
   const reports = useLiveQuery(() => db.reports.orderBy('date').toArray())
@@ -92,8 +111,8 @@ export function Compare() {
       .sort((x, y) => y.b + y.a - (x.b + x.a))
 
     // ASIN bazında eşleştirme (aynı firmanın iki tarihi için anlamlı)
-    const ma = new Map(fa.map((p) => [p.asin, p]))
-    const mb = new Map(fb.map((p) => [p.asin, p]))
+    const ma = byAsin(fa)
+    const mb = byAsin(fb)
     const pairs: Pair[] = [...new Set([...ma.keys(), ...mb.keys()])].map((asin) => {
       const a = ma.get(asin)
       const b = mb.get(asin)
@@ -186,7 +205,6 @@ export function Compare() {
         <Search className='me-auto' />
         <ThemeSwitch />
         <ConfigDrawer />
-        <ProfileDropdown />
       </Header>
 
       <Main className='flex flex-1 flex-col gap-4'>

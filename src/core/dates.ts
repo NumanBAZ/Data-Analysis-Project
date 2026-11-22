@@ -53,13 +53,12 @@ export function guessDate(
     if (d) return { date: d, yearGuessed: false }
   }
 
-  m = s.match(/(\d{1,2})\s*([a-z]{3,})\.?\s*(\d{4}|\d{2})?/)
-  if (m) {
-    const month = MONTHS[m[2].slice(0, 3)]
-    if (month) {
-      const d = iso(fullYear(m[3], fallbackYear), month, +m[1])
-      if (d) return { date: d, yearGuessed: !m[3] }
-    }
+  // "Top 100 urun 5 ocak" gibi adlarda ilk eşleşme ay değildir; ay olan ilk eşleşmeye kadar bakılır
+  for (const x of s.matchAll(/(?<!\d)(\d{1,2})\s*([a-z]{3,})\.?\s*(\d{4}|\d{2})?/g)) {
+    const month = MONTHS[x[2].slice(0, 3)]
+    if (!month) continue
+    const d = iso(fullYear(x[3], fallbackYear), month, +x[1])
+    if (d) return { date: d, yearGuessed: !x[3] }
   }
   return null
 }
