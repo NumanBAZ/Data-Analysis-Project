@@ -33,7 +33,10 @@ run('pnpm tauri build', {
 })
 
 // 3) Dosyaları hazırla (GitHub dosya adındaki boşlukları bozduğu için boşluksuz ad)
-const dir = 'src-tauri/target/release/bundle/nsis'
+const target = JSON.parse(
+  execSync('cargo metadata --format-version 1 --no-deps', { cwd: 'src-tauri' }).toString()
+).target_directory
+const dir = join(target, 'release', 'bundle', 'nsis')
 const src = join(dir, `${conf.productName}_${version}_x64-setup.exe`)
 const exe = `RakipAnalizi_${version}_x64-setup.exe`
 const out = join(dir, exe)
