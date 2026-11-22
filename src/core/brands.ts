@@ -96,7 +96,27 @@ export const OWN_BRANDS = ['Kraken', 'Sprayman', 'Stanley', 'Akfix']
  * Alt markalar: verisi ayrı firma olarak tutulur ve ayrı grafiklerde görünür,
  * ama ekranlarda hangi markaya bağlı olduğu not olarak gösterilir.
  */
-export const PARENT_BRANDS: Record<string, string> = { sprayman: 'Kraken' }
+export const PARENT_BRANDS: Record<string, string> = {
+  sprayman: 'Kraken',
+  // 2026-11: Ixir ile Magic Chems birleşti; Magic Chems ayrı izlenir, grup toplamı Ixir'de gösterilir
+  magicchems: 'Ixir',
+}
+
+/** Alt markaysa bağlı olduğu ana marka */
+export const parentOf = (company: string): string | undefined => PARENT_BRANDS[brandKey(company)]
+
+/**
+ * Ana markanın kendisi + alt markalarının son cirosu. Alt markası olmayan ya da kendisi
+ * alt marka olan firma için null (grup toplamı gösterilmez).
+ */
+export function groupRevenue(company: string, latest: { company: string; revenue: number }[]): { total: number; subs: string[] } | null {
+  if (parentOf(company)) return null
+  const key = brandKey(company)
+  const subs = latest.filter((x) => brandKey(parentOf(x.company) ?? '') === key)
+  if (!subs.length) return null
+  const own = latest.find((x) => x.company === company)?.revenue ?? 0
+  return { total: own + subs.reduce((s, x) => s + x.revenue, 0), subs: subs.map((x) => x.company) }
+}
 
 /** "AKFIX PRO" -> "Akfix Pro". Kısa kısaltmalar (3M, DAP) korunur. */
 function titleCase(s: string): string {

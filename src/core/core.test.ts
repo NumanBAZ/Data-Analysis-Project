@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { brandKey, createBrandResolver } from './brands'
+import { brandKey, createBrandResolver, groupRevenue, parentOf } from './brands'
 import { applyRules, cleanSheet, computeTotals } from './clean'
 import { matchField } from './columns'
 import { guessDate } from './dates'
@@ -310,5 +310,23 @@ describe('V4 JSON kategori kütüphanesi', () => {
     for (const r of v4.reports)
       for (const p of r.products)
         if (p.category && p.category !== 'Tanımlanmamış' && lib.has(p.asin)) expect(lib.get(p.asin)).toBe(p.category)
+  })
+})
+
+describe('alt markalar', () => {
+  const latest = [
+    { company: 'Ixir', revenue: 455 },
+    { company: 'Magic Chems', revenue: 756 },
+    { company: 'Kraken', revenue: 1000 },
+    { company: 'Beest', revenue: 300 },
+  ]
+  it('Magic Chems Ixir alt markası', () => expect(parentOf('Magic Chems')).toBe('Ixir'))
+  it('ana markada grup toplamı alt markaları içerir', () =>
+    expect(groupRevenue('Ixir', latest)).toEqual({ total: 1211, subs: ['Magic Chems'] }))
+  it('alt markada ve alt markası olmayanda grup yok', () => {
+    expect(groupRevenue('Magic Chems', latest)).toBeNull()
+    expect(groupRevenue('Beest', latest)).toBeNull()
+    // Sprayman raporu yoksa Kraken'de grup gösterilmez
+    expect(groupRevenue('Kraken', latest)).toBeNull()
   })
 })

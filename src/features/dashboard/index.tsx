@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { DollarSign, FileUp, PieChart, ShoppingCart } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { brandKey } from '@/core/brands'
+import { brandKey, groupRevenue, parentOf } from '@/core/brands'
 import { formatDateTR, shortDateTR } from '@/core/dates'
 import { buildSheetsWorkbook, categoryRevenue } from '@/core/reports'
 import type { Product, Report } from '@/core/types'
@@ -70,6 +70,11 @@ export function Dashboard() {
   // Firma sıralaması: ciroya göre çoktan aza ya da azdan çoğa (grafik ve tablo birlikte)
   const [order, setOrder] = useState<'desc' | 'asc'>('desc')
   const sorted = order === 'desc' ? companies : [...companies].reverse()
+  // Alt markası olan firmalar için grup toplamı (Ixir + Magic Chems, Kraken + Sprayman)
+  const groups = useMemo(() => {
+    const latest = companies.map((c) => ({ company: c.company, revenue: c.last.totals.revenue }))
+    return new Map(companies.map((c) => [c.company, groupRevenue(c.company, latest)]))
+  }, [companies])
   const orderToggle = (
     <Segmented value={order} onChange={setOrder} options={[{ value: 'desc', label: 'Çoktan aza' }, { value: 'asc', label: 'Azdan çoğa' }]} />
   )
@@ -290,9 +295,17 @@ export function Dashboard() {
                         <TableRow key={c.company} className='cursor-pointer' onClick={() => openFirm(c.company)}>
                           <TableCell className='font-medium'>
                             <BrandBadge brand={c.company} /> {c.own && <Badge variant='secondary' className='ms-1'>Biz</Badge>}
+                            {parentOf(c.company) && <span className='ms-1.5 text-xs font-normal text-muted-foreground'>{parentOf(c.company)} alt markası</span>}
                           </TableCell>
                           <TableCell>{formatDateTR(c.last.date)}</TableCell>
-                          <TableCell className='text-right tabular-nums'>{fmt.money(c.last.totals.revenue)}</TableCell>
+                          <TableCell className='text-right tabular-nums'>
+                            {fmt.money(c.last.totals.revenue)}
+                            {groups.get(c.company) && (
+                              <span className='block text-xs text-muted-foreground'>
+                                Grup {fmt.money(groups.get(c.company)!.total)}
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell className={cn('text-right tabular-nums',
                             d === null ? 'text-muted-foreground' : d >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                             {d === null ? '–' : fmt.delta(d)}

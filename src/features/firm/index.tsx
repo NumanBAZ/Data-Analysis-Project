@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Package, PieChart as PieIcon, ShoppingCart, X } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { brandKey } from '@/core/brands'
+import { brandKey, groupRevenue, parentOf } from '@/core/brands'
 import { formatDateTR, shortDateTR } from '@/core/dates'
 import { byCategory, categoriesIn, totalsOf } from '@/core/filter'
 import { buildReportWorkbook } from '@/core/reports'
@@ -119,6 +119,14 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
     }
   }, [reports, selected, prev])
 
+  // Alt marka ilişkisi: ana markada grup toplamı, alt markada bağlı olduğu marka
+  const parent = brand ? parentOf(brand) : undefined
+  const group = useMemo(() => {
+    if (!selected || !reports || !brand) return null
+    const latest = reportsAt(reports, selected.date).map((r) => ({ company: r.brand, revenue: r.totals.revenue }))
+    return groupRevenue(brand, latest)
+  }, [reports, selected, brand])
+
   // Kategoriler: renk sırası ciroya göre; donut'ta ilk 7 + Diğer
   const cats = useMemo(() => categoriesIn(products).filter((c) => c.revenue > 0), [products])
   const colorOf = useMemo(() => new Map(cats.map((c, i) => [c.category, colorAt(i)])), [cats])
@@ -210,7 +218,10 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
         ) : (
           <>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              <StatCard icon={DollarSign} tone='blue' label='Ciro' value={fmt.money(now.revenue)} delta={before ? change(now.revenue, before.revenue) : null} />
+              <StatCard icon={DollarSign} tone='blue' label='Ciro' value={fmt.money(now.revenue)} delta={before ? change(now.revenue, before.revenue) : null}>
+                {group && <p>Grup cirosu ({group.subs.join(', ')} dahil): <span className='font-medium text-foreground'>{fmt.money(group.total)}</span></p>}
+                {parent && <p>{parent} alt markası</p>}
+              </StatCard>
               <StatCard icon={ShoppingCart} tone='green' label='Satış (adet)' value={fmt.int(now.sales)} delta={before ? change(now.sales, before.sales) : null} />
               <StatCard icon={PieIcon} tone='violet' label='Pazar payı' value={fmt.pct(market.share)}
                 unit={market.rank ? `${market.rank}. sırada` : undefined}
