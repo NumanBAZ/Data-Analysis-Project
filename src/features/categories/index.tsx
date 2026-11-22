@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Check, Plus, Sparkles } from 'lucide-react'
+import { Check, Pencil, Plus, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { UNDEFINED_CATEGORY } from '@/core/clean'
 import { fold } from '@/core/text'
 import { db } from '@/data/db'
 import { ProductImage } from '@/components/product-image'
 import { CategorySelect } from '@/components/category-select'
-import { addCategoryToList, categoryUsage, getCategoryList, restoreCategory, setCategories, setCategory } from '@/data/repo'
+import { addCategoryToList, categoryUsage, getCategoryList, renameCategory, restoreCategory, setCategories, setCategory } from '@/data/repo'
 import { CONFIDENT, suggestCategory, trainCategoryModel, type Suggestion } from '@/core/suggest'
 import { fmt } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
@@ -238,6 +238,25 @@ function CategoryListPanel() {
   const list = useLiveQuery(getCategoryList)
   const usage = useLiveQuery(categoryUsage)
   const [name, setName] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
+
+  const rename = async (from: string) => {
+    const to = newName.trim().replace(/\s+/g, ' ')
+    if (!to || to === from) return setEditing(null)
+    const same = (list ?? []).find((c) => c !== from && c.toLocaleLowerCase('tr') === to.toLocaleLowerCase('tr'))
+    const msg = same
+      ? `"${same}" kategorisi zaten var. "${from}" ürünleri "${same}" ile birleştirilsin mi?`
+      : `"${from}" kategorisinin adı bütün raporlarda "${to}" olsun mu?`
+    if (!window.confirm(msg)) return
+    try {
+      const r = await renameCategory(from, same ?? to)
+      setEditing(null)
+      toast.success(`"${from}" → "${same ?? to}"`, { description: `${fmt.int(r.asins)} ASIN güncellendi. Yeni raporlarda da bu ad kullanılacak.` })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const add = async () => {
     try {
@@ -262,7 +281,24 @@ function CategoryListPanel() {
           <TableBody>
             {(list ?? []).map((c) => (
               <TableRow key={c}>
-                <TableCell className='font-medium'>{c}</TableCell>
+                <TableCell className='font-medium'>
+                  {editing === c ? (
+                    <form className='flex gap-2' onSubmit={(e) => { e.preventDefault(); void rename(c) }}>
+                      <Input autoFocus className='h-8' spellCheck={false} autoComplete='off' value={newName} onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null) }} />
+                      <Button type='submit' size='sm' disabled={!newName.trim()}>Kaydet</Button>
+                      <Button type='button' size='sm' variant='ghost' onClick={() => setEditing(null)}>Vazgeç</Button>
+                    </form>
+                  ) : (
+                    <div className='flex items-center gap-2'>
+                      {c}
+                      <Button type='button' size='sm' variant='ghost' className='h-7 px-2 text-xs text-muted-foreground'
+                        onClick={() => { setEditing(c); setNewName(c) }}>
+                        <Pencil className='size-3' /> Adını değiştir
+                      </Button>
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className='text-right tabular-nums'>{fmt.int(usage?.get(c) ?? 0)}</TableCell>
               </TableRow>
             ))}

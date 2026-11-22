@@ -41,10 +41,12 @@ export type SaveOptions = {
 
 /** Önizlemesi onaylanmış bir sayfayı rapor olarak kaydeder. */
 /** Onaylı ad kuralları (örn. adında "Fire Block" geçen = Fire Block) yeni yüklenen ürünlere de uygulanır */
-function applyTitleRulesTo(products: DraftProduct[]): DraftProduct[] {
+function applyTitleRulesTo(products: DraftProduct[], renames: Record<string, string>): DraftProduct[] {
   return products.map((p) => {
     const rule = TITLE_RULES.find((r) => r.match.test(p.title ?? ''))
-    return rule && p.category !== rule.category ? { ...p, category: rule.category } : p
+    // Adı sonradan değiştirilmiş kategori, dosyada ya da kuralda eski adıyla gelse de yeni adı alır
+    const category = renamed(renames, rule ? rule.category : p.category)
+    return category !== p.category ? { ...p, category } : p
   })
 }
 
@@ -56,7 +58,7 @@ export async function saveSheet(sheet: ParsedSheet, opts: SaveOptions): Promise<
   const drafts = (opts.products ?? sheet.products).map((p) =>
     p.brand === opts.brand && p.brandKey === key ? p : { ...p, brand: opts.brand, brandKey: key }
   )
-  const { products } = applyRules(applyTitleRulesTo(drafts), key, opts.settings.rule)
+  const { products } = applyRules(applyTitleRulesTo(drafts, await getCategoryRenames()), key, opts.settings.rule)
   const report: Report = {
     name: sheet.sheetName && sheet.sheetName !== 'Sheet1'
       ? `${sheet.fileName} / ${sheet.sheetName}`
@@ -217,7 +219,13 @@ export async function seedCategoriesIfNeeded(): Promise<{ added: number; fixed: 
   if ((done?.version ?? 0) >= CATEGORY_SEED_VERSION) return { added: 0, fixed: 0 }
   const res = await fetch('/seed/categories.json')
   if (!res.ok) return { added: 0, fixed: 0 }
-  const seed = (await res.json()) as { entries: CategoryEntry[]; categoryList?: string[] }
+  const raw = (await res.json()) as { entries: CategoryEntry[]; categoryList?: string[] }
+  // Kullanıcının değiştirdiği kategori adları kütüphane dosyasındaki eski adların yerine geçer
+  const renames = await getCategoryRenames()
+  const seed = {
+    entries: raw.entries.map((e) => ({ ...e, category: renamed(renames, e.category) })),
+    categoryList: raw.categoryList && [...new Set(raw.categoryList.map((c) => renamed(renames, c)))],
+  }
 
   return db.transaction('rw', db.categories, db.products, db.kv, async () => {
     const existing = new Map((await db.categories.toArray()).map((c) => [c.asin, c]))
@@ -297,6 +305,52 @@ export async function addCategoryToList(name: string): Promise<string> {
   return clean
 }
 
+// ---------------------------------------------------------------------------
+// Kategori adını değiştirme
+// ---------------------------------------------------------------------------
+
+const CATEGORY_RENAMES_KEY = 'category-renames'
+
+/** Eski ad → yeni ad. Yeni yüklenen dosyalarda, kurulumla gelen kütüphanede ve ad kurallarında eski ad gelirse yenisine çevrilir. */
+export async function getCategoryRenames(): Promise<Record<string, string>> {
+  return ((await db.kv.get(CATEGORY_RENAMES_KEY))?.value as Record<string, string> | undefined) ?? {}
+}
+
+/** Zincirleme değişiklikleri izler (A→B, B→C ise A→C). Ad tam eşleşmeyle aranır: "Foam" ≠ "Foam Set". */
+export function renamed(renames: Record<string, string>, name: string): string {
+  let cur = name
+  for (let i = 0; i < 20 && renames[cur] !== undefined; i++) cur = renames[cur]
+  return cur
+}
+
+/**
+ * Kategorinin adını her yerde değiştirir: ASIN kütüphanesi, eski/yeni bütün raporlardaki ürünler,
+ * kategori listesi. Yeni ad zaten varsa iki kategori birleşir. Eski ad hatırlanır; sonradan gelen
+ * dosyalarda eski ad yazsa bile yeni ad kullanılır.
+ */
+export async function renameCategory(from: string, to: string): Promise<{ asins: number; products: number }> {
+  const clean = to.trim().replace(/\s+/g, ' ')
+  if (!clean) throw new Error('Kategori adı boş olamaz.')
+  if (from === UNDEFINED_CATEGORY || clean === UNDEFINED_CATEGORY) throw new Error(`"${UNDEFINED_CATEGORY}" değiştirilemez.`)
+  if (clean === from) return { asins: 0, products: 0 }
+
+  return db.transaction('rw', db.categories, db.products, db.kv, async () => {
+    const asins = await db.categories.filter((c) => c.category === from).modify({ category: clean })
+    const products = await db.products.where('category').equals(from).modify({ category: clean })
+
+    const saved = ((await db.kv.get(CATEGORY_LIST_KEY))?.value as string[] | undefined) ?? []
+    await db.kv.put({ key: CATEGORY_LIST_KEY, value: [...new Set([...saved.filter((c) => c !== from), clean])] })
+
+    const map = await getCategoryRenames()
+    // Daha önce "from"a çevrilen adlar artık doğrudan yeni ada gider; geri dönüşte döngü olmasın
+    for (const k of Object.keys(map)) if (map[k] === from) map[k] = clean
+    map[from] = clean
+    delete map[clean]
+    await db.kv.put({ key: CATEGORY_RENAMES_KEY, value: map })
+    return { asins, products }
+  })
+}
+
 /** Kategori kaç ASIN'de kullanılıyor */
 export async function categoryUsage(): Promise<Map<string, number>> {
   const m = new Map<string, number>()
@@ -325,7 +379,9 @@ export async function applyTitleCategoryRules(): Promise<{ category: string; asi
   if (!todo.length) return []
   const out: { category: string; asins: number }[] = []
   const products = await db.products.toArray()
-  for (const rule of todo) {
+  const renames = await getCategoryRenames()
+  for (const r of todo) {
+    const rule = { ...r, category: renamed(renames, r.category) }
     const items = new Map<string, { asin: string; category: string; brandKey: string }>()
     for (const p of products) {
       if (p.asin && rule.match.test(p.title ?? '')) items.set(p.asin, { asin: p.asin, category: rule.category, brandKey: p.brandKey })
