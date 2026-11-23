@@ -4,7 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeftRight } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatDateTR } from '@/core/dates'
-import { ALL, byCategory, categoriesIn, categoryOf, totalsOf } from '@/core/filter'
+import { ALL, byCategory, categoriesIn, categoryOf, categoryOptions, totalsOf, type CategoryOption } from '@/core/filter'
+import { useCategoryTree } from '@/components/category-select'
 import { buildSheetsWithProducts, type SheetSpec } from '@/core/reports'
 import type { Product, Report } from '@/core/types'
 import { db } from '@/data/db'
@@ -91,6 +92,7 @@ export function Compare() {
   const B = resolve(pb, 'b')
   const A = resolve(pa, 'a', B)
   const sameCompany = A.company === B.company
+  const tree = useCategoryTree()
 
   const data = useLiveQuery(async () => {
     if (!A.report || !B.report) return null
@@ -100,8 +102,8 @@ export function Compare() {
 
   const result = useMemo(() => {
     if (!data) return null
-    const fa = byCategory(data.a, A.category)
-    const fb = byCategory(data.b, B.category)
+    const fa = byCategory(data.a, A.category, tree)
+    const fb = byCategory(data.b, B.category, tree)
     const ta = totalsOf(fa)
     const tb = totalsOf(fb)
     const ca = new Map(categoriesIn(fa).map((c) => [c.category, c]))
@@ -128,16 +130,12 @@ export function Compare() {
       topA: top(fa),
       topB: top(fb),
     }
-  }, [data, A.category, B.category])
+  }, [data, A.category, B.category, tree])
 
-  // Kategori seçicilerinde yalnızca o raporda bulunan kategoriler
-  const catsA = useMemo(() => categoriesIn(data?.a ?? []), [data])
-  const catsB = useMemo(() => categoriesIn(data?.b ?? []), [data])
-  const catsBoth = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const c of [...catsA, ...catsB]) m.set(c.category, (m.get(c.category) ?? 0) + c.revenue)
-    return [...m].sort((x, y) => y[1] - x[1]).map(([category]) => category)
-  }, [catsA, catsB])
+  // Kategori seçicilerinde yalnızca o raporda bulunan kategoriler (+ üst kategorileri), ağaç sırasıyla
+  const catsA = useMemo(() => categoryOptions(data?.a ?? [], tree), [data, tree])
+  const catsB = useMemo(() => categoryOptions(data?.b ?? [], tree), [data, tree])
+  const catsBoth = useMemo(() => categoryOptions([...(data?.a ?? []), ...(data?.b ?? [])], tree), [data, tree])
 
   const swap = () => {
     setPa({ company: B.company, reportId: B.report ? String(B.report.id) : undefined, category: B.category })
@@ -370,16 +368,16 @@ function SidePanel({ tag, color, side, companies, reports, cats, catOptions, cat
   side: Side
   companies: string[]
   reports: Report[]
-  cats: { category: string; revenue: number; count: number }[]
+  cats: CategoryOption[]
   /** Aynı kategori modunda iki raporun kategorileri birlikte */
-  catOptions?: string[]
+  catOptions?: CategoryOption[]
   categoryLocked?: boolean
   onCompany: (c: string) => void
   onReport: (id: string) => void
   onCategory: (c: string) => void
 }) {
   const count = new Map(cats.map((c) => [c.category, c.count]))
-  const options = catOptions ?? cats.map((c) => c.category)
+  const options = catOptions ?? cats
   return (
     <Card className='gap-3 py-4'>
       <CardContent className='space-y-3'>
@@ -410,8 +408,13 @@ function SidePanel({ tag, color, side, companies, reports, cats, catOptions, cat
               <SelectTrigger className='w-full'><SelectValue /></SelectTrigger>
               <SelectContent className='max-h-80'>
                 <SelectItem value={ALL}>Bütün kategoriler</SelectItem>
-                {options.map((c) => (
-                  <SelectItem key={c} value={c}>{c}{count.has(c) ? ` (${count.get(c)})` : ''}</SelectItem>
+                {options.map((o) => (
+                  <SelectItem key={o.category} value={o.category} className={cn(o.isGroup && 'font-semibold')}>
+                    <span style={{ paddingInlineStart: o.depth * 16 }}>
+                      {o.depth > 0 && <span className='text-muted-foreground'>└ </span>}
+                      {o.category}{o.isGroup ? ' (tümü)' : ''}{count.has(o.category) ? ` (${count.get(o.category)})` : ''}
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

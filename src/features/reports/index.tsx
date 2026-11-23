@@ -6,7 +6,9 @@ import { toast } from 'sonner'
 import { formatDateTR } from '@/core/dates'
 import { PARENT_BRANDS } from '@/core/brands'
 import { db } from '@/data/db'
-import { deleteReport, getCategoryList, getProducts, loadImages } from '@/data/repo'
+import { deleteReport, getCategoryList, getCategoryTree, getProducts, loadImages } from '@/data/repo'
+import { flattenTree, selfAndDescendants } from '@/core/tree'
+import { useCategoryTree } from '@/components/category-select'
 import { buildAnnualWorkbook, buildReportWorkbook, buildSheetsWorkbook, buildSummaryWorkbook } from '@/core/reports'
 import type { Product, Report, ReportTotals } from '@/core/types'
 import { ALL, totalsOf } from '@/core/filter'
@@ -47,20 +49,23 @@ export function Reports() {
   const companies = [...new Set((reports ?? []).map((r) => r.brand))].sort((a, b) => a.localeCompare(b, 'tr'))
   const [company, setCompany] = useState(ALL)
   const [category, setCategory] = useState(ALL)
-  const catList = useLiveQuery(getCategoryList) ?? []
+  const tree = useCategoryTree()
+  const catRows = flattenTree(tree, useLiveQuery(getCategoryList) ?? [])
   const catName = category === ALL ? undefined : category
 
-  // Kategori seçiliyse her raporun o kategorideki toplamları (kategori sütunu indeksli, hızlı)
+  // Kategori seçiliyse her raporun o kategorideki (+ alt kategorilerindeki) toplamları (kategori sütunu indeksli, hızlı)
   const catTotals = useLiveQuery(async () => {
     if (!catName) return null
-    const products = await db.products.where('category').equals(catName).toArray()
+    const list = await getCategoryList()
+    const t = await getCategoryTree()
+    const products = await db.products.where('category').anyOf([...selfAndDescendants(t, catName, list)]).toArray()
     const by = new Map<number, Product[]>()
     for (const p of products) {
       if (!by.has(p.reportId)) by.set(p.reportId, [])
       by.get(p.reportId)!.push(p)
     }
     return new Map([...by].map(([id, list]) => [id, totalsOf(list)]))
-  }, [catName])
+  }, [catName, tree])
 
   const rows = useMemo(() => {
     const list = (reports ?? []).filter((r) => company === ALL || r.brand === company)
@@ -184,7 +189,14 @@ export function Reports() {
               <SelectTrigger className='w-56'><SelectValue /></SelectTrigger>
               <SelectContent className='max-h-80'>
                 <SelectItem value={ALL}>Bütün kategoriler</SelectItem>
-                {catList.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {catRows.map((c) => (
+                  <SelectItem key={c.name} value={c.name} className={cn(c.hasChildren && 'font-semibold')}>
+                    <span style={{ paddingInlineStart: c.depth * 16 }}>
+                      {c.depth > 0 && <span className='text-muted-foreground'>└ </span>}
+                      {c.name}{c.hasChildren ? ' (tümü)' : ''}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

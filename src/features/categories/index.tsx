@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Check, Pencil, Plus, Sparkles } from 'lucide-react'
+import { Check, FolderTree, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { UNDEFINED_CATEGORY } from '@/core/clean'
 import { fold } from '@/core/text'
 import { db } from '@/data/db'
 import { ProductImage } from '@/components/product-image'
 import { CategorySelect } from '@/components/category-select'
-import { addCategoryToList, categoryUsage, getCategoryList, renameCategory, restoreCategory, setCategories, setCategory } from '@/data/repo'
+import { restoreCategory, setCategories, setCategory } from '@/data/repo'
 import { CONFIDENT, suggestCategory, trainCategoryModel, type Suggestion } from '@/core/suggest'
 import { fmt } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
@@ -40,7 +40,7 @@ type AsinRow = {
 const PAGE = 100
 
 export function Categories() {
-  const [tab, setTab] = useState<'undefined' | 'all' | 'list'>('undefined')
+  const [tab, setTab] = useState<'undefined' | 'all'>('undefined')
   const [q, setQ] = useState('')
 
   // ASIN başına tek satır: en son görülen ürün bilgisi + toplam ciro
@@ -114,15 +114,13 @@ export function Categories() {
                 Tanımlanmamış <Badge variant={undefinedCount ? 'destructive' : 'secondary'} className='ms-1'>{undefinedCount}</Badge>
               </TabsTrigger>
               <TabsTrigger value='all'>Bütün ASIN'ler</TabsTrigger>
-              <TabsTrigger value='list'>Kategori listesi</TabsTrigger>
             </TabsList>
           </Tabs>
-          {tab !== 'list' && (
-            <>
-              <Input className='h-9 w-72' placeholder='ASIN, ürün, marka ara…' spellCheck={false} autoComplete='off' value={q} onChange={(e) => setQ(e.target.value)} />
-              <span className='text-sm text-muted-foreground'>{fmt.int(visible.length)} ASIN</span>
-            </>
-          )}
+          <Input className='h-9 w-72' placeholder='ASIN, ürün, marka ara…' spellCheck={false} autoComplete='off' value={q} onChange={(e) => setQ(e.target.value)} />
+          <span className='text-sm text-muted-foreground'>{fmt.int(visible.length)} ASIN</span>
+          <Button variant='outline' size='sm' asChild>
+            <Link to='/ayarlar'><FolderTree /> Kategori ekle / düzenle (Ayarlar)</Link>
+          </Button>
           {tab === 'undefined' && confident.length > 0 && (
             <Button size='sm' className='ms-auto' onClick={() => void acceptAll()}>
               <Sparkles /> Emin önerileri kabul et ({confident.length})
@@ -130,7 +128,6 @@ export function Categories() {
           )}
         </div>
 
-        {tab === 'list' ? <CategoryListPanel /> : <>
         <div className='overflow-hidden rounded-md border'>
           <Table>
             <TableHeader>
@@ -156,7 +153,6 @@ export function Categories() {
         {visible.length > PAGE && (
           <p className='text-sm text-muted-foreground'>İlk {PAGE} satır gösteriliyor (ciroya göre). Aramayla daraltın.</p>
         )}
-        </>}
       </Main>
     </>
   )
@@ -233,89 +229,3 @@ function definedLabel(iso: string) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** Seçilebilir kategoriler; yeni kategori yalnızca buradan eklenir. */
-function CategoryListPanel() {
-  const list = useLiveQuery(getCategoryList)
-  const usage = useLiveQuery(categoryUsage)
-  const [name, setName] = useState('')
-  const [editing, setEditing] = useState<string | null>(null)
-  const [newName, setNewName] = useState('')
-
-  const rename = async (from: string) => {
-    const to = newName.trim().replace(/\s+/g, ' ')
-    if (!to || to === from) return setEditing(null)
-    const same = (list ?? []).find((c) => c !== from && c.toLocaleLowerCase('tr') === to.toLocaleLowerCase('tr'))
-    const msg = same
-      ? `"${same}" kategorisi zaten var. "${from}" ürünleri "${same}" ile birleştirilsin mi?`
-      : `"${from}" kategorisinin adı bütün raporlarda "${to}" olsun mu?`
-    if (!window.confirm(msg)) return
-    try {
-      const r = await renameCategory(from, same ?? to)
-      setEditing(null)
-      toast.success(`"${from}" → "${same ?? to}"`, { description: `${fmt.int(r.asins)} ASIN güncellendi. Yeni raporlarda da bu ad kullanılacak.` })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  const add = async () => {
-    try {
-      const added = await addCategoryToList(name)
-      setName('')
-      toast.success(`"${added}" kategorisi eklendi.`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  return (
-    <div className='grid gap-4 lg:grid-cols-[1fr_22rem]'>
-      <div className='overflow-hidden rounded-md border'>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Kategori</TableHead>
-              <TableHead className='text-right'>Kullanılan ASIN</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(list ?? []).map((c) => (
-              <TableRow key={c}>
-                <TableCell className='font-medium'>
-                  {editing === c ? (
-                    <form className='flex gap-2' onSubmit={(e) => { e.preventDefault(); void rename(c) }}>
-                      <Input autoFocus className='h-8' spellCheck={false} autoComplete='off' value={newName} onChange={(e) => setNewName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null) }} />
-                      <Button type='submit' size='sm' disabled={!newName.trim()}>Kaydet</Button>
-                      <Button type='button' size='sm' variant='ghost' onClick={() => setEditing(null)}>Vazgeç</Button>
-                    </form>
-                  ) : (
-                    <div className='flex items-center gap-2'>
-                      {c}
-                      <Button type='button' size='sm' variant='ghost' className='h-7 px-2 text-xs text-muted-foreground'
-                        onClick={() => { setEditing(c); setNewName(c) }}>
-                        <Pencil className='size-3' /> Adını değiştir
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell className='text-right tabular-nums'>{fmt.int(usage?.get(c) ?? 0)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <div className='h-fit space-y-3 rounded-md border p-4'>
-        <p className='font-medium'>Yeni kategori ekle</p>
-        <p className='text-sm text-muted-foreground'>
-          Ürünlere kategori yalnızca bu listeden seçilerek verilir; böylece yazım hatası yeni bir kategori oluşturamaz.
-          Aynı adda (büyük/küçük harf farkı dahil) kategori varsa eklenmez.
-        </p>
-        <form className='flex gap-2' onSubmit={(e) => { e.preventDefault(); void add() }}>
-          <Input placeholder='Örn. Spray' spellCheck={false} autoComplete='off' value={name} onChange={(e) => setName(e.target.value)} />
-          <Button type='submit' disabled={!name.trim()}><Plus /> Ekle</Button>
-        </form>
-      </div>
-    </div>
-  )
-}

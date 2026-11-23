@@ -7,6 +7,7 @@ import {
   type ParsedSheet,
 } from '@/core/clean'
 import type { CategoryEntry, Product, Report, Settings } from '@/core/types'
+import { canMoveUnder, childrenOf, type CategoryTree } from '@/core/tree'
 import { db } from './db'
 
 export async function loadCategoryMap(): Promise<Map<string, string>> {
@@ -219,12 +220,16 @@ export async function seedCategoriesIfNeeded(): Promise<{ added: number; fixed: 
   if ((done?.version ?? 0) >= CATEGORY_SEED_VERSION) return { added: 0, fixed: 0 }
   const res = await fetch('/seed/categories.json')
   if (!res.ok) return { added: 0, fixed: 0 }
-  const raw = (await res.json()) as { entries: CategoryEntry[]; categoryList?: string[] }
+  const raw = (await res.json()) as { entries: CategoryEntry[]; categoryList?: string[]; categoryTree?: CategoryTree }
   // Kullanıcının değiştirdiği kategori adları kütüphane dosyasındaki eski adların yerine geçer
   const renames = await getCategoryRenames()
   const seed = {
     entries: raw.entries.map((e) => ({ ...e, category: renamed(renames, e.category) })),
-    categoryList: raw.categoryList && [...new Set(raw.categoryList.map((c) => renamed(renames, c)))],
+    categoryList: [...new Set([
+      ...(raw.categoryList ?? []),
+      ...Object.entries(raw.categoryTree ?? {}).flatMap(([c, n]) => (n.parent ? [c, n.parent] : [c])),
+    ].map((c) => renamed(renames, c)))],
+    tree: Object.entries(raw.categoryTree ?? {}).map(([c, n]) => ({ name: renamed(renames, c), parent: n.parent ? renamed(renames, n.parent) : '', at: n.at })),
   }
 
   return db.transaction('rw', db.categories, db.products, db.kv, async () => {
@@ -247,6 +252,18 @@ export async function seedCategoriesIfNeeded(): Promise<{ added: number; fixed: 
     if (seed.categoryList?.length) {
       const saved = ((await db.kv.get(CATEGORY_LIST_KEY))?.value as string[] | undefined) ?? []
       await db.kv.put({ key: CATEGORY_LIST_KEY, value: [...new Set([...saved, ...seed.categoryList])] })
+    }
+    // Ağaç: dosyadaki yerleşim, uygulamada daha yeni bir elle değişiklik yoksa geçerli olur
+    if (seed.tree.length) {
+      const tree = await getCategoryTree()
+      for (const n of seed.tree) {
+        if (!n.name || n.name === n.parent) continue
+        const old = tree[n.name]
+        if (old && old.at >= n.at) continue
+        if (!canMoveUnder(tree, n.name, n.parent)) continue
+        tree[n.name] = { parent: n.parent, at: n.at }
+      }
+      await db.kv.put({ key: CATEGORY_TREE_KEY, value: tree })
     }
 
     const lib = new Map((await db.categories.toArray()).map((c) => [c.asin, c.category]))
@@ -293,16 +310,73 @@ export async function getCategoryList(): Promise<string[]> {
     .sort((a, b) => a.localeCompare(b, 'tr'))
 }
 
-/** Listeye yeni kategori ekler. Büyük/küçük harf farkıyla aynısı varsa eklemez ve hata verir. */
-export async function addCategoryToList(name: string): Promise<string> {
+/**
+ * Listeye yeni kategori ekler; `parent` verilirse onun alt kategorisi olur.
+ * Büyük/küçük harf farkıyla aynısı varsa eklemez ve hata verir.
+ */
+export async function addCategoryToList(name: string, parent = ''): Promise<string> {
   const clean = name.trim().replace(/\s+/g, ' ')
   if (!clean) throw new Error('Kategori adı boş olamaz.')
-  const list = await getCategoryList()
-  const same = list.find((c) => c.toLocaleLowerCase('tr') === clean.toLocaleLowerCase('tr'))
-  if (same) throw new Error(`"${same}" zaten listede.`)
-  const saved = ((await db.kv.get(CATEGORY_LIST_KEY))?.value as string[] | undefined) ?? []
-  await db.kv.put({ key: CATEGORY_LIST_KEY, value: [...saved, clean] })
-  return clean
+  if (clean === UNDEFINED_CATEGORY) throw new Error(`"${UNDEFINED_CATEGORY}" kategori olarak eklenemez.`)
+  return db.transaction('rw', db.categories, db.kv, async () => {
+    const list = await getCategoryList()
+    const same = list.find((c) => c.toLocaleLowerCase('tr') === clean.toLocaleLowerCase('tr'))
+    if (same) throw new Error(`"${same}" zaten listede.`)
+    if (parent && !list.includes(parent)) throw new Error(`Üst kategori "${parent}" bulunamadı.`)
+    const saved = ((await db.kv.get(CATEGORY_LIST_KEY))?.value as string[] | undefined) ?? []
+    await db.kv.put({ key: CATEGORY_LIST_KEY, value: [...saved, clean] })
+    if (parent) {
+      const tree = await getCategoryTree()
+      tree[clean] = { parent, at: new Date().toISOString() }
+      await db.kv.put({ key: CATEGORY_TREE_KEY, value: tree })
+    }
+    return clean
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Kategori ağacı (alt kategoriler)
+// ---------------------------------------------------------------------------
+
+const CATEGORY_TREE_KEY = 'category-tree'
+
+export async function getCategoryTree(): Promise<CategoryTree> {
+  const saved = (await db.kv.get(CATEGORY_TREE_KEY))?.value as CategoryTree | undefined
+  return saved ? { ...saved } : {}
+}
+
+/** Kategoriyi başka bir kategorinin altına taşır; `parent` '' ise ana kategori yapar. ASIN atamaları değişmez. */
+export async function setCategoryParent(name: string, parent: string) {
+  await db.transaction('rw', db.categories, db.kv, async () => {
+    const list = await getCategoryList()
+    if (!list.includes(name)) throw new Error(`"${name}" bulunamadı.`)
+    if (parent && !list.includes(parent)) throw new Error(`Üst kategori "${parent}" bulunamadı.`)
+    const tree = await getCategoryTree()
+    if (!canMoveUnder(tree, name, parent)) throw new Error(`"${name}" kendi alt kategorisinin altına taşınamaz.`)
+    tree[name] = { parent, at: new Date().toISOString() }
+    await db.kv.put({ key: CATEGORY_TREE_KEY, value: tree })
+  })
+}
+
+/**
+ * Kategoriyi siler. Yalnızca boş kategori silinir: hiçbir ASIN'e atanmamış ve alt kategorisi yok.
+ * (Dolu kategoriyi kaldırmak için önce ürünleri başka kategoriye verin ya da adını değiştirip birleştirin.)
+ */
+export async function deleteCategory(name: string) {
+  await db.transaction('rw', db.categories, db.products, db.kv, async () => {
+    if (name === UNDEFINED_CATEGORY) throw new Error(`"${UNDEFINED_CATEGORY}" silinemez.`)
+    const used = await db.categories.filter((c) => c.category === name).count()
+    const inProducts = await db.products.where('category').equals(name).count()
+    if (used || inProducts) throw new Error(`"${name}" ${used || inProducts} üründe kullanılıyor; önce o ürünlere başka kategori verin.`)
+    const tree = await getCategoryTree()
+    const list = await getCategoryList()
+    const kids = childrenOf(tree, name, list)
+    if (kids.length) throw new Error(`"${name}" altında ${kids.length} alt kategori var (${kids.slice(0, 3).join(', ')}); önce onları taşıyın ya da silin.`)
+    const saved = ((await db.kv.get(CATEGORY_LIST_KEY))?.value as string[] | undefined) ?? []
+    await db.kv.put({ key: CATEGORY_LIST_KEY, value: saved.filter((c) => c !== name) })
+    delete tree[name]
+    await db.kv.put({ key: CATEGORY_TREE_KEY, value: tree })
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -335,6 +409,8 @@ export async function renameCategory(from: string, to: string): Promise<{ asins:
   if (clean === from) return { asins: 0, products: 0 }
 
   return db.transaction('rw', db.categories, db.products, db.kv, async () => {
+    // Yeni ad zaten bir kategoriyse iki kategori birleşir
+    const merged = (await getCategoryList()).includes(clean)
     const asins = await db.categories.filter((c) => c.category === from).modify({ category: clean })
     const products = await db.products.where('category').equals(from).modify({ category: clean })
 
@@ -347,6 +423,17 @@ export async function renameCategory(from: string, to: string): Promise<{ asins:
     map[from] = clean
     delete map[clean]
     await db.kv.put({ key: CATEGORY_RENAMES_KEY, value: map })
+
+    // Ağaç: yeni ad eskisinin yerini alır, alt kategoriler yeni adın altında kalır.
+    // Birleşmede hedef kategori kendi yerinde kalır.
+    const tree = await getCategoryTree()
+    const now = new Date().toISOString()
+    if (tree[from] && !merged) tree[clean] = { ...tree[from], at: now }
+    delete tree[from]
+    for (const k of Object.keys(tree)) if (tree[k].parent === from) tree[k] = { parent: clean, at: now }
+    // Hedef, eskisinin alt kategorisiyse kendi kendinin altına düşmesin
+    if (tree[clean] && !canMoveUnder(tree, clean, tree[clean].parent)) tree[clean] = { parent: '', at: now }
+    await db.kv.put({ key: CATEGORY_TREE_KEY, value: tree })
     return { asins, products }
   })
 }

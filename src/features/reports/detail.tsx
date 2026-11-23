@@ -8,8 +8,8 @@ import { parseUSNumber } from '@/core/number'
 import { fold } from '@/core/text'
 import type { Product } from '@/core/types'
 import { db } from '@/data/db'
-import { getProducts, loadImages, updateProduct, type EditableField } from '@/data/repo'
-import { ALL, byCategory, categoriesIn, totalsOf } from '@/core/filter'
+import { getCategoryTree, getProducts, loadImages, updateProduct, type EditableField } from '@/data/repo'
+import { ALL, byCategory, categoryOptions, totalsOf } from '@/core/filter'
 import { buildReportWorkbook, productCsvRows } from '@/core/reports'
 import { printPDF, saveExport, toCSV } from '@/lib/export'
 import { ExportMenu } from '@/components/export-menu'
@@ -25,7 +25,7 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProductImage } from '@/components/product-image'
-import { CategorySelect } from '@/components/category-select'
+import { CategorySelect, useCategoryTree } from '@/components/category-select'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { BrandBadge } from '@/components/brand-badge'
@@ -74,15 +74,16 @@ export function ReportDetail({ id }: { id: number }) {
   const [category, setCategory] = useState(ALL)
   const catName = category === ALL ? undefined : category
 
-  const cats = useMemo(() => categoriesIn(products ?? []), [products])
-  const filtered = useMemo(() => byCategory(products ?? [], category), [products, category])
+  const tree = useCategoryTree()
+  const cats = useMemo(() => categoryOptions(products ?? [], tree), [products, tree])
+  const filtered = useMemo(() => byCategory(products ?? [], category, tree), [products, category, tree])
   const totals = useMemo(() => totalsOf(filtered), [filtered])
   // Önceki raporun aynı kategoriye göre toplamları
   const prevTotals = useLiveQuery(async () => {
     if (!prev) return null
     if (!catName) return { ...prev.totals }
-    return totalsOf(byCategory(await getProducts([prev.id!]), catName))
-  }, [prev?.id, catName, prev?.totals.revenue])
+    return totalsOf(byCategory(await getProducts([prev.id!]), catName, await getCategoryTree()))
+  }, [prev?.id, catName, prev?.totals.revenue, tree])
 
   const visible = useMemo(() => {
     const f = fold(q)
@@ -171,7 +172,12 @@ export function ReportDetail({ id }: { id: number }) {
             <SelectContent className='max-h-80'>
               <SelectItem value={ALL}>Bütün kategoriler ({fmt.int(products?.length ?? 0)})</SelectItem>
               {cats.map((c) => (
-                <SelectItem key={c.category} value={c.category}>{c.category} ({c.count}) · {fmt.moneyCompact(c.revenue)}</SelectItem>
+                <SelectItem key={c.category} value={c.category} className={cn(c.isGroup && 'font-semibold')}>
+                  <span style={{ paddingInlineStart: c.depth * 16 }}>
+                    {c.depth > 0 && <span className='text-muted-foreground'>└ </span>}
+                    {c.category}{c.isGroup ? ' (tümü)' : ''} ({c.count}) · {fmt.moneyCompact(c.revenue)}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

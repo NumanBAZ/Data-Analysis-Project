@@ -19,6 +19,7 @@ import { Route as AuthenticatedRaporlarIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedKategorilerIndexRouteImport } from './routes/_authenticated/kategoriler/index'
 import { Route as AuthenticatedKarsilastirIndexRouteImport } from './routes/_authenticated/karsilastir/index'
 import { Route as AuthenticatedFirmaIndexRouteImport } from './routes/_authenticated/firma/index'
+import { Route as AuthenticatedAyarlarIndexRouteImport } from './routes/_authenticated/ayarlar/index'
 import { Route as AuthenticatedUrunAsinIndexRouteImport } from './routes/_authenticated/urun/$asin/index'
 import { Route as AuthenticatedRaporlarIdIndexRouteImport } from './routes/_authenticated/raporlar/$id/index'
 
@@ -74,6 +75,12 @@ const AuthenticatedFirmaIndexRoute = AuthenticatedFirmaIndexRouteImport.update({
   path: '/firma/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAyarlarIndexRoute =
+  AuthenticatedAyarlarIndexRouteImport.update({
+    id: '/ayarlar/',
+    path: '/ayarlar/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUrunAsinIndexRoute =
   AuthenticatedUrunAsinIndexRouteImport.update({
     id: '/urun/$asin/',
@@ -91,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/404': typeof errors404Route
   '/500': typeof errors500Route
+  '/ayarlar/': typeof AuthenticatedAyarlarIndexRoute
   '/firma/': typeof AuthenticatedFirmaIndexRoute
   '/karsilastir/': typeof AuthenticatedKarsilastirIndexRoute
   '/kategoriler/': typeof AuthenticatedKategorilerIndexRoute
@@ -104,6 +112,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/': typeof AuthenticatedIndexRoute
+  '/ayarlar': typeof AuthenticatedAyarlarIndexRoute
   '/firma': typeof AuthenticatedFirmaIndexRoute
   '/karsilastir': typeof AuthenticatedKarsilastirIndexRoute
   '/kategoriler': typeof AuthenticatedKategorilerIndexRoute
@@ -119,6 +128,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/ayarlar/': typeof AuthenticatedAyarlarIndexRoute
   '/_authenticated/firma/': typeof AuthenticatedFirmaIndexRoute
   '/_authenticated/karsilastir/': typeof AuthenticatedKarsilastirIndexRoute
   '/_authenticated/kategoriler/': typeof AuthenticatedKategorilerIndexRoute
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
     | '/'
     | '/404'
     | '/500'
+    | '/ayarlar/'
     | '/firma/'
     | '/karsilastir/'
     | '/kategoriler/'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/'
+    | '/ayarlar'
     | '/firma'
     | '/karsilastir'
     | '/kategoriler'
@@ -161,6 +173,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/_authenticated/'
+    | '/_authenticated/ayarlar/'
     | '/_authenticated/firma/'
     | '/_authenticated/karsilastir/'
     | '/_authenticated/kategoriler/'
@@ -249,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFirmaIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ayarlar/': {
+      id: '/_authenticated/ayarlar/'
+      path: '/ayarlar'
+      fullPath: '/ayarlar/'
+      preLoaderRoute: typeof AuthenticatedAyarlarIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/urun/$asin/': {
       id: '/_authenticated/urun/$asin/'
       path: '/urun/$asin'
@@ -268,6 +288,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAyarlarIndexRoute: typeof AuthenticatedAyarlarIndexRoute
   AuthenticatedFirmaIndexRoute: typeof AuthenticatedFirmaIndexRoute
   AuthenticatedKarsilastirIndexRoute: typeof AuthenticatedKarsilastirIndexRoute
   AuthenticatedKategorilerIndexRoute: typeof AuthenticatedKategorilerIndexRoute
@@ -280,6 +301,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAyarlarIndexRoute: AuthenticatedAyarlarIndexRoute,
   AuthenticatedFirmaIndexRoute: AuthenticatedFirmaIndexRoute,
   AuthenticatedKarsilastirIndexRoute: AuthenticatedKarsilastirIndexRoute,
   AuthenticatedKategorilerIndexRoute: AuthenticatedKategorilerIndexRoute,
