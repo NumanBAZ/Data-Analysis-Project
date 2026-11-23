@@ -38,7 +38,8 @@ export function CategorySelect({
   return (
     <Select value={value || undefined} onValueChange={onChange} open={open} onOpenChange={onOpenChange}>
       <SelectTrigger className={cn('h-8 w-full', className)} title={value ? pathOf(tree, value) : undefined}>
-        <SelectValue placeholder={placeholder}>{value ? pathOf(tree, value) : undefined}</SelectValue>
+        {/* Dar sütunlara sığsın diye yalnızca ad; tam yol üzerine gelince */}
+        <SelectValue placeholder={placeholder}>{value || undefined}</SelectValue>
       </SelectTrigger>
       <SelectContent className='max-h-80'>
         {rows.map((r) => (

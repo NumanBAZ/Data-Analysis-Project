@@ -15,6 +15,13 @@
   }
   body {
     @apply min-h-svh w-full bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar;
+    /* Masaüstü uygulama: düz yazının üzerinde yazı imleci (dikey çubuk) çıkmasın; yalnızca yazılabilen kutularda çıksın */
+    cursor: default;
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:disabled),
+  textarea:not(:disabled),
+  [contenteditable='true'] {
+    cursor: text;
   }
 
   /* Override Radix scroll locking for sticky headers */

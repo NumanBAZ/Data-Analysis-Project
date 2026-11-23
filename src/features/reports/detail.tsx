@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, DollarSign, Package, Pencil, ShoppingCart, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowLeft, ChevronDown, DollarSign, Package, Pencil, ShoppingCart, TrendingDown, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDateTR } from '@/core/dates'
 import { parseUSNumber } from '@/core/number'
@@ -301,7 +301,8 @@ function EditCell({ product, col }: { product: Product; col: Col }) {
 
   return (
     <TableCell
-      className={cn('cursor-text tabular-nums', col.width, align(col), edit && 'bg-amber-50 dark:bg-amber-950/40')}
+      // Kategori açılır menüden seçilir (el imleci); diğer alanlara yazılır (yazı imleci)
+      className={cn(col.field === 'category' ? 'cursor-pointer' : 'cursor-text', 'tabular-nums', col.width, align(col), edit && 'bg-amber-50 dark:bg-amber-950/40')}
       title={[
         col.kind === 'text' && current ? String(current) : '',
         edit ? `Elle değiştirildi. Dosyadaki değer: ${show(col.kind, edit.from)}` : '',
@@ -337,7 +338,15 @@ function EditCell({ product, col }: { product: Product; col: Col }) {
           }}
         />
       ) : (
-        col.field === 'brand' ? <BrandBadge brand={String(current ?? '')} /> : <span className='block truncate'>{show(col.kind, current)}</span>
+        col.field === 'brand' ? <BrandBadge brand={String(current ?? '')} />
+        : col.field === 'category' ? (
+          // Açılır menü olduğu belli olsun: üzerine gelince kutu ve ok görünür
+          <span className='flex h-7 items-center justify-between gap-1 rounded-md border border-transparent px-2 hover:border-input hover:bg-background'>
+            <span className='truncate'>{show(col.kind, current)}</span>
+            <ChevronDown className='size-3.5 shrink-0 opacity-50' />
+          </span>
+        )
+        : <span className='block truncate'>{show(col.kind, current)}</span>
       )}
     </TableCell>
   )
