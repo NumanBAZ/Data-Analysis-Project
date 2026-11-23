@@ -85,6 +85,10 @@ fn write_file(request: tauri::ipc::Request<'_>) -> Result<(), String> {
         .and_then(|v| v.to_str().ok())
         .map(percent_decode)
         .ok_or("Dosya yolu alınamadı.")?;
+    // Yedek klasörü gibi alt klasörlere yazarken klasörler yoksa oluştur
+    if let Some(parent) = Path::new(&path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     std::fs::write(&path, data).map_err(|e| {
         if e.kind() == std::io::ErrorKind::PermissionDenied {
             "Dosya yazılamadı. Excel'de açıksa kapatıp tekrar deneyin.".to_string()
@@ -92,6 +96,29 @@ fn write_file(request: tauri::ipc::Request<'_>) -> Result<(), String> {
             format!("Dosya yazılamadı: {e}")
         }
     })
+}
+
+fn collect_all(dir: &Path, out: &mut Vec<String>, depth: u8) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let mut items: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+    items.sort();
+    for p in items {
+        if p.is_dir() {
+            if depth > 0 {
+                collect_all(&p, out, depth - 1);
+            }
+        } else {
+            out.push(p.to_string_lossy().into_owned());
+        }
+    }
+}
+
+/// Klasördeki bütün dosyalar (yedek klasörünü geri yüklemek için, 3 alt klasöre kadar).
+#[tauri::command]
+fn list_files(dir: String) -> Vec<String> {
+    let mut out = Vec::new();
+    collect_all(Path::new(&dir), &mut out, 3);
+    out
 }
 
 /// Dosyayı Windows'taki varsayılan programla açar.
@@ -122,6 +149,7 @@ pub fn run() {
             expand_paths,
             read_file,
             write_file,
+            list_files,
             open_path
         ])
         .run(tauri::generate_context!())

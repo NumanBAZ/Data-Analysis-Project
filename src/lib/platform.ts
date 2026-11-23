@@ -138,3 +138,28 @@ export async function openPath(path: string) {
   const { invoke } = await tauri()
   await invoke('open_path', { path })
 }
+
+/** Klasör seçtirir (yalnızca masaüstü). Seçilen yolu döndürür. */
+export async function pickDirectory(title: string): Promise<string | null> {
+  if (!isDesktop) return null
+  const { dialog } = await tauri()
+  const picked = await dialog.open({ directory: true, multiple: false, title })
+  return (picked as string | null) ?? null
+}
+
+/** Verilen yola dosya yazar; eksik klasörler oluşturulur (yalnızca masaüstü). */
+export async function writeFileAt(path: string, data: Uint8Array) {
+  const { invoke } = await tauri()
+  await invoke('write_file', data, { headers: { path: encodeURIComponent(path) } })
+}
+
+/** Klasördeki bütün dosyaların yolları (alt klasörler dahil, yalnızca masaüstü). */
+export async function listFiles(dir: string): Promise<string[]> {
+  const { invoke } = await tauri()
+  return invoke<string[]>('list_files', { dir })
+}
+
+export async function readFileAt(path: string): Promise<Uint8Array> {
+  const { invoke } = await tauri()
+  return new Uint8Array(await invoke<ArrayBuffer>('read_file', { path }))
+}

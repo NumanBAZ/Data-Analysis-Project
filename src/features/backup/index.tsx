@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { DatabaseBackup, Loader2, Upload } from 'lucide-react'
+import { DatabaseBackup, FolderOpen, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { createBackup, readBackup, restoreBackup } from '@/data/backup'
+import { type BackupData, createBackupFiles, createSingleFileBackup, readBackup, readBackupFolder, restoreBackup } from '@/data/backup'
 import { db } from '@/data/db'
 import { fmt } from '@/lib/format'
-import { openPath, saveFile } from '@/lib/platform'
+import { isDesktop, listFiles, openPath, pickDirectory, readFileAt, saveFile, writeFileAt } from '@/lib/platform'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,16 +27,33 @@ export function Backup() {
     last: (await db.kv.get(LAST_KEY))?.value as string | undefined,
   }))
 
+  const stamp = () => new Date().toLocaleString('sv-SE').slice(0, 16).replace(':', '-')
+
   const backup = async () => {
     setBusy(true)
     try {
-      const { data } = await createBackup()
-      const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '-')
-      const path = await saveFile(`Benasse Yedek ${stamp}.json`, data, { name: 'Yedek', ext: 'json', mime: 'application/json' })
-      if (path) {
+      let where: string | null
+      let total = 0
+      if (isDesktop) {
+        const parent = await pickDirectory('Yedek klasörünün oluşturulacağı yeri seçin')
+        if (!parent) return
+        const { files } = await createBackupFiles()
+        where = `${parent.replace(/[\\/]+$/, '')}\\Benasse Yedek ${stamp()}`
+        for (const f of files) {
+          await writeFileAt(`${where}\\${f.path.split('/').join('\\')}`, f.data)
+          total += f.data.length
+        }
+      } else {
+        // Tarayıcıda klasör yazılamaz; tek dosya indirilir
+        const data = await createSingleFileBackup()
+        total = data.length
+        where = await saveFile(`Benasse Yedek ${stamp()}.json`, data, { name: 'Yedek', ext: 'json', mime: 'application/json' })
+      }
+      if (where) {
         await db.kv.put({ key: LAST_KEY, value: new Date().toISOString() })
-        toast.success(`Yedek kaydedildi (${(data.length / 1024 / 1024).toFixed(1)} MB).`, {
-          action: { label: 'Klasörü aç', onClick: () => void openPath(path.replace(/[\\/][^\\/]+$/, '')) },
+        const folder = where
+        toast.success(`Yedek klasörü kaydedildi (${(total / 1024 / 1024).toFixed(1)} MB).`, {
+          action: { label: 'Klasörü aç', onClick: () => void openPath(folder) },
         })
       }
     } catch (e) {
@@ -46,7 +63,38 @@ export function Backup() {
     }
   }
 
-  const restore = () => {
+  const confirmAndRestore = async (file: BackupData) => {
+    const c = file.counts
+    const ok = window.confirm(
+      `${new Date(file.createdAt).toLocaleString('tr-TR')} tarihli yedek yüklenecek:\n` +
+        `${c.reports} rapor, ${c.products} ürün satırı, ${c.categories} kategorili ASIN, ${c.images} görsel.\n\n` +
+        'Şu anki bütün veriler silinip yerine bu yedek konacak. Devam edilsin mi?'
+    )
+    if (!ok) return
+    await restoreBackup(file)
+    toast.success('Yedek geri yüklendi.')
+  }
+
+  const restoreFolder = async () => {
+    const dir = await pickDirectory('Yedek klasörünü seçin (içinde yedek.json olan)')
+    if (!dir) return
+    setBusy(true)
+    try {
+      const root = dir.replace(/[\\/]+$/, '')
+      const map = new Map<string, Uint8Array>()
+      for (const p of await listFiles(root)) {
+        const rel = p.slice(root.length + 1).split('\\').join('/')
+        map.set(rel, await readFileAt(p))
+      }
+      await confirmAndRestore(readBackupFolder(map))
+    } catch (e) {
+      toast.error('Geri yüklenemedi: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const restoreOldFile = () => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json,application/json'
@@ -55,16 +103,7 @@ export function Backup() {
       if (!f) return
       setBusy(true)
       try {
-        const file = readBackup(await f.text())
-        const c = file.counts
-        const ok = window.confirm(
-          `${new Date(file.createdAt).toLocaleString('tr-TR')} tarihli yedek yüklenecek:\n` +
-            `${c.reports} rapor, ${c.products} ürün satırı, ${c.categories} kategori, ${c.images} görsel.\n\n` +
-            'Şu anki bütün veriler silinip yerine bu yedek konacak. Devam edilsin mi?'
-        )
-        if (!ok) return
-        await restoreBackup(file)
-        toast.success('Yedek geri yüklendi.')
+        await confirmAndRestore(readBackup(await f.text()))
       } catch (e) {
         toast.error('Geri yüklenemedi: ' + (e instanceof Error ? e.message : String(e)))
       } finally {
@@ -86,7 +125,7 @@ export function Backup() {
         <div>
           <h2 className='text-2xl font-bold tracking-tight'>Yedekleme</h2>
           <p className='text-muted-foreground'>
-            Bütün raporlar, elle yapılan düzeltmeler, kategori kütüphanesi, ayarlar ve görseller tek bir dosyaya yazılır.
+            Bütün raporlar, elle yapılan düzeltmeler, kategori kütüphanesi, ayarlar ve görseller bir klasöre ayrı ayrı dosyalar halinde yazılır.
           </p>
         </div>
 
@@ -103,7 +142,7 @@ export function Backup() {
                 Son yedek: {counts?.last ? new Date(counts.last).toLocaleString('tr-TR') : 'hiç alınmadı'}
               </p>
               <Button onClick={() => void backup()} disabled={busy}>
-                {busy ? <Loader2 className='animate-spin' /> : <DatabaseBackup />} Yedek dosyası kaydet
+                {busy ? <Loader2 className='animate-spin' /> : <DatabaseBackup />} Yedek klasörü kaydet
               </Button>
             </CardContent>
           </Card>
@@ -118,9 +157,16 @@ export function Backup() {
                 <AlertTitle>Dikkat</AlertTitle>
                 <AlertDescription>Geri yükleme şu anki verilerin tamamını siler. Önce yedek almanız önerilir.</AlertDescription>
               </Alert>
-              <Button variant='outline' onClick={restore} disabled={busy}>
-                <Upload /> Yedek dosyası seç
-              </Button>
+              <div className='flex flex-wrap gap-2'>
+                {isDesktop && (
+                  <Button variant='outline' onClick={() => void restoreFolder()} disabled={busy}>
+                    <FolderOpen /> Yedek klasörü seç
+                  </Button>
+                )}
+                <Button variant='ghost' onClick={restoreOldFile} disabled={busy}>
+                  <Upload /> Eski tek dosya yedek (.json)
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
