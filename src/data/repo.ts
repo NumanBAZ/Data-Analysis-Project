@@ -206,7 +206,7 @@ export async function loadImages(asins: string[]): Promise<Map<string, { data: U
 // ---------------------------------------------------------------------------
 
 /** Kütüphane dosyası güncellenince artırılır; uygulama bir sonraki açılışta yeni atamaları alır. */
-const CATEGORY_SEED_VERSION = 2
+const CATEGORY_SEED_VERSION = 3
 
 /**
  * Kurulumla gelen ASIN → kategori kütüphanesini (public/seed/categories.json) yükler.
@@ -220,7 +220,17 @@ export async function seedCategoriesIfNeeded(): Promise<{ added: number; fixed: 
   if ((done?.version ?? 0) >= CATEGORY_SEED_VERSION) return { added: 0, fixed: 0 }
   const res = await fetch('/seed/categories.json')
   if (!res.ok) return { added: 0, fixed: 0 }
-  const raw = (await res.json()) as { entries: CategoryEntry[]; categoryList?: string[]; categoryTree?: CategoryTree }
+  const raw = (await res.json()) as {
+    entries: CategoryEntry[]
+    categoryList?: string[]
+    categoryTree?: CategoryTree
+    categoryRenames?: Record<string, string>
+  }
+  // Kütüphanedeki eski ad → yeni ad (örn. ağaca geçişte "Sealant" → "Sealants & Caulks"): uygulamada eski ad
+  // hâlâ kullanılıyorsa (kullanıcının kendi atamaları dahil) her yerde yenisine çevrilir, yeni yüklemelerde de geçerli olur
+  for (const [from, to] of Object.entries(raw.categoryRenames ?? {})) {
+    if (from && to && from !== to && (await getCategoryList()).includes(from)) await renameCategory(from, to)
+  }
   // Kullanıcının değiştirdiği kategori adları kütüphane dosyasındaki eski adların yerine geçer
   const renames = await getCategoryRenames()
   const seed = {

@@ -90,6 +90,39 @@ describe('kategori ağacı', () => {
     expect((await getCategoryTree())['Boş Alt']).toBeUndefined()
   })
 
+  it('kütüphanedeki eski ad eşlemesi kullanıcının kendi atamalarına da uygulanır', async () => {
+    // Kullanıcı kütüphanede olmayan bir ASIN'i eski adla tanımlamış
+    await db.categories.put({ asin: 'U1', category: 'Glue', brandKey: 'x', definedAt: '2026-11-20T00:00:00.000Z' })
+    await db.products.add(product('U1', 'Glue') as never)
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      entries: [{ asin: 'A1', category: 'Gap Filler', brandKey: 'benasse', definedAt: '2026-11-23T10:00:00.000Z' }],
+      categoryTree: { 'Köpük': { parent: '', at: '2026-11-23T10:00:00.000Z' }, 'Gap Filler': { parent: 'Köpük', at: '2026-11-23T10:00:00.000Z' } },
+      categoryRenames: { Foam: 'Köpük', Glue: 'Yapıştırıcı', Yok: 'Köpük' },
+    }))) as typeof fetch
+    await seedCategoriesIfNeeded()
+    expect((await db.categories.get('U1'))!.category).toBe('Yapıştırıcı')
+    expect((await db.products.where('asin').equals('U1').first())!.category).toBe('Yapıştırıcı')
+    expect((await db.categories.get('A1'))!.category).toBe('Gap Filler')
+    const list = await getCategoryList()
+    expect(list).not.toContain('Foam')
+    expect(list).not.toContain('Glue')
+    expect(pathOf(await getCategoryTree(), 'Gap Filler')).toBe('Köpük › Gap Filler')
+  })
+
+  it('kurulum kütüphanesi dosyası tutarlı: her atama ağaçta, her alt kategorinin üstü var', async () => {
+    const { readFileSync } = await import('node:fs')
+    const f = JSON.parse(readFileSync(new URL('../../public/seed/categories.json', import.meta.url), 'utf8')) as {
+      entries: { asin: string; category: string }[]
+      categoryTree: Record<string, { parent: string }>
+      categoryRenames: Record<string, string>
+    }
+    const names = new Set(Object.keys(f.categoryTree))
+    expect(f.entries.filter((e) => !names.has(e.category))).toEqual([])
+    expect(Object.values(f.categoryTree).filter((n) => n.parent && !names.has(n.parent))).toEqual([])
+    expect(Object.values(f.categoryRenames).filter((n) => !names.has(n))).toEqual([])
+    expect(new Set(f.entries.map((e) => e.asin)).size).toBe(f.entries.length)
+  })
+
   it('kurulum kütüphanesindeki ağaç uygulanır, daha yeni elle değişiklik ezilmez', async () => {
     await addCategoryToList('Gun Foam', 'Foam')
     await setCategoryParent('Gun Foam', '')
