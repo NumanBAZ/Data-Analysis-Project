@@ -110,8 +110,7 @@ describe('kategori ağacı', () => {
   })
 
   it('kurulum kütüphanesi dosyası tutarlı: her atama ağaçta, her alt kategorinin üstü var', async () => {
-    const { readFileSync } = await import('node:fs')
-    const f = JSON.parse(readFileSync(new URL('../../public/seed/categories.json', import.meta.url), 'utf8')) as {
+    const f = (await import('../../public/seed/categories.json')).default as unknown as {
       entries: { asin: string; category: string }[]
       categoryTree: Record<string, { parent: string }>
       categoryRenames: Record<string, string>
