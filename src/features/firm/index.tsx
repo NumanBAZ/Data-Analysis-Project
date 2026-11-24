@@ -5,7 +5,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Package, PieChart as PieIc
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { brandKey, groupRevenue, parentOf } from '@/core/brands'
 import { formatDateTR, shortDateTR } from '@/core/dates'
-import { byCategory, categoriesIn, totalsOf } from '@/core/filter'
+import { ALL, byCategory, categoriesIn, categoryOptions, totalsOf } from '@/core/filter'
+import { ancestorsOf, parentOf as treeParentOf, selfAndDescendants } from '@/core/tree'
 import { buildReportWorkbook } from '@/core/reports'
 import type { Product, Report } from '@/core/types'
 import { db, getSettings } from '@/data/db'
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useCategoryTree } from '@/components/category-select'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ExportMenu } from '@/components/export-menu'
 import { Header } from '@/components/layout/header'
@@ -28,10 +30,11 @@ import { StatCard } from '@/components/stat-card'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ChangesCard } from '@/features/dashboard/components/insights'
 
-/** Donut'ta ayrı dilim olarak gösterilen en büyük kategori sayısı; gerisi "Diğer" */
-const SLICES = 7
-const OTHER = 'Diğer'
-const colorAt = (i: number) => (i < SLICES ? `var(--cat-${i + 1})` : 'var(--cat-other)')
+/** Renk paletindeki renk sayısı; fazlası gri */
+const COLORS = 8
+const colorAt = (i: number) => (i < COLORS ? `var(--cat-${i + 1})` : 'var(--cat-other)')
+/** Ürün tablosunda bir seferde gösterilen satır */
+const PAGE = 50
 
 type SortKey = 'price' | 'sales' | 'revenue'
 const SORT_VALUE: Record<SortKey, (p: Product) => number | null> = {
@@ -102,8 +105,29 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
   const products = useMemo(() => (selected && byReport?.get(selected.id!)) || [], [selected, byReport])
   const prevProducts = useMemo(() => (prev && byReport?.get(prev.id!)) || [], [prev, byReport])
 
-  const now = totalsOf(products)
-  const before = prev ? totalsOf(prevProducts) : null
+  const tree = useCategoryTree()
+  const catOptions = useMemo(() => categoryOptions(products, tree), [products, tree])
+  // Seçili kategori (açılır listeden ya da grafiğe tıklayarak); üst kategori altlarını kapsar
+  const activeCat = category && catOptions.some((c) => c.category === category) ? category : undefined
+  const activeSet = useMemo(
+    () => (activeCat ? selfAndDescendants(tree, activeCat, catOptions.map((c) => c.category)) : null),
+    [activeCat, tree, catOptions],
+  )
+  const catProducts = useMemo(() => byCategory(products, activeCat, tree), [products, activeCat, tree])
+  const catPrevProducts = useMemo(() => byCategory(prevProducts, activeCat, tree), [prevProducts, activeCat, tree])
+
+  const firmNow = totalsOf(products)
+  const firmBefore = prev ? totalsOf(prevProducts) : null
+  const now = activeCat ? totalsOf(catProducts) : firmNow
+  const before = prev ? (activeCat ? totalsOf(catPrevProducts) : firmBefore) : null
+  // Kategorinin firma cirosundaki payı
+  const catShare = firmNow.revenue ? now.revenue / firmNow.revenue : null
+  const catSharePrev = before && firmBefore?.revenue ? before.revenue / firmBefore.revenue : null
+  // Seçimin ana kategorisi (pastada) ve çubuklarda seçili olan
+  const rootOf = (c: string) => ancestorsOf(tree, c)[0] ?? c
+  const activeRoot = activeCat ? rootOf(activeCat) : undefined
+  const dimRoot = (name: string) => !!activeRoot && activeRoot !== name
+  const dimBar = (name: string) => !!activeSet && !activeSet.has(name) && !(activeRoot && name === activeCat)
 
   // Pazar payı: aynı tarihteki bütün firmaların raporlarına göre
   const market = useMemo(() => {
@@ -127,22 +151,31 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
     return groupRevenue(brand, latest)
   }, [reports, selected, brand])
 
-  // Kategoriler: renk sırası ciroya göre; donut'ta ilk 7 + Diğer
-  const cats = useMemo(() => categoriesIn(products).filter((c) => c.revenue > 0), [products])
+  // Pasta: yalnızca ana kategoriler (alt kategorilerin cirosu dahil), ciroya göre
+  const slices = useMemo(
+    () => catOptions.filter((c) => c.depth === 0 && c.revenue > 0)
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((c) => ({ name: c.category, value: c.revenue })),
+    [catOptions],
+  )
+  // Çubuklar: ana kategori seçiliyse onun alt kategorileri (+ doğrudan ana kategoriye atananlar), değilse bütün kategoriler
+  const cats = useMemo(() => {
+    if (!activeRoot) return categoriesIn(products).filter((c) => c.revenue > 0).map((c) => ({ category: c.category, revenue: c.revenue }))
+    const own = categoriesIn(products).find((c) => c.category === activeRoot)
+    const kids = catOptions.filter((c) => c.category !== activeRoot && treeParentOf(tree, c.category) === activeRoot)
+      .map((c) => ({ category: c.category, revenue: c.revenue }))
+    if (own && own.revenue > 0) kids.push({ category: activeRoot, revenue: own.revenue })
+    return kids.filter((c) => c.revenue > 0).sort((a, b) => b.revenue - a.revenue)
+  }, [products, catOptions, tree, activeRoot])
   const colorOf = useMemo(() => new Map(cats.map((c, i) => [c.category, colorAt(i)])), [cats])
-  const slices = useMemo(() => {
-    const head = cats.slice(0, SLICES).map((c) => ({ name: c.category, value: c.revenue }))
-    const rest = cats.slice(SLICES).reduce((s, c) => s + c.revenue, 0)
-    return rest > 0 ? [...head, { name: OTHER, value: rest }] : head
-  }, [cats])
 
   const trend = brandReports.map((r) => ({
     date: shortDateTR(r.date),
-    ciro: Math.round(totalsOf(byReport?.get(r.id!) ?? []).revenue),
+    ciro: Math.round(totalsOf(byCategory(byReport?.get(r.id!) ?? [], activeCat, tree)).revenue),
   }))
 
-  const activeCat = category && colorOf.has(category) ? category : undefined
   // Ürün tablosu: Fiyat / Satış / Ciro başlığına tıklayınca çoktan aza, tekrar tıklayınca azdan çoğa
+  const [shown, setShown] = useState(PAGE)
   const [sort, setSort] = useState<{ key: SortKey; dir: 'desc' | 'asc' }>({ key: 'revenue', dir: 'desc' })
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }))
@@ -150,21 +183,22 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
     const v = SORT_VALUE[sort.key]
     const sign = sort.dir === 'desc' ? -1 : 1
     // Değeri boş olan ürünler her iki yönde de en alta
-    return [...byCategory(products, activeCat)]
+    return [...catProducts]
       .sort((a, b) => {
         const x = v(a)
         const y = v(b)
         if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1
         return sign * (x - y)
       })
-      .slice(0, 20)
-  }, [products, activeCat, sort])
+      .slice(0, shown)
+  }, [catProducts, sort, shown])
   const prevByAsin = useMemo(() => new Map(prevProducts.map((p) => [p.asin, p])), [prevProducts])
-  const pickCat = (c?: string) => setCategory(c && c !== OTHER && c !== activeCat ? c : undefined)
+  const pickCat = (c?: string) => { setShown(PAGE); setCategory(c && c !== activeCat ? c : undefined) }
 
   const pickBrand = (b: string) => {
     setReportId(undefined)
     setCategory(undefined)
+    setShown(PAGE)
     navigate({ to: '/firma', search: { marka: b } })
   }
 
@@ -192,6 +226,22 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                 </SelectContent>
               </Select>
               {selected && (
+                <Select value={activeCat ?? ALL} onValueChange={(v) => { setShown(PAGE); setCategory(v === ALL ? undefined : v) }}>
+                  <SelectTrigger className='w-60'><SelectValue /></SelectTrigger>
+                  <SelectContent className='max-h-80'>
+                    <SelectItem value={ALL}>Bütün kategoriler</SelectItem>
+                    {catOptions.map((c) => (
+                      <SelectItem key={c.category} value={c.category} className={cn(c.isGroup && 'font-semibold')}>
+                        <span style={{ paddingInlineStart: c.depth * 16 }}>
+                          {c.depth > 0 && <span className='text-muted-foreground'>└ </span>}
+                          {c.category}{c.isGroup ? ' (tümü)' : ''} ({c.count}) · {fmt.moneyCompact(c.revenue)}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selected && (
                 <Select value={String(selected.id)} onValueChange={(v) => { setReportId(Number(v)); setCategory(undefined) }}>
                   <SelectTrigger className='w-44'><SelectValue /></SelectTrigger>
                   <SelectContent className='max-h-80'>
@@ -209,7 +259,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
             </>
           )}
         </div>
-        {selected && <PrintHeader title={`${brand} · Firma Analizi`} subtitle={`${formatDateTR(selected.date)} raporu`} />}
+        {selected && <PrintHeader title={`${brand}${activeCat ? ` · ${activeCat}` : ''} · Firma Analizi`} subtitle={`${formatDateTR(selected.date)} raporu`} />}
 
         {reports && !companies.length ? (
           <Card><CardContent className='py-16 text-center text-muted-foreground'>Henüz rapor yok. Dosya yükleyerek başlayın.</CardContent></Card>
@@ -218,32 +268,38 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
         ) : (
           <>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              <StatCard icon={DollarSign} tone='blue' label='Ciro' value={fmt.money(now.revenue)} delta={before ? change(now.revenue, before.revenue) : null}>
-                {group && <p>Grup cirosu ({group.subs.join(', ')} dahil): <span className='font-medium text-foreground'>{fmt.money(group.total)}</span></p>}
-                {parent && <p>{parent} alt markası</p>}
+              <StatCard icon={DollarSign} tone='blue' label={activeCat ? `${activeCat} cirosu` : 'Ciro'} value={fmt.money(now.revenue)} delta={before ? change(now.revenue, before.revenue) : null}>
+                {activeCat && <p>Firma cirosu: <span className='font-medium text-foreground'>{fmt.money(firmNow.revenue)}</span></p>}
+                {!activeCat && group && <p>Grup cirosu ({group.subs.join(', ')} dahil): <span className='font-medium text-foreground'>{fmt.money(group.total)}</span></p>}
+                {!activeCat && parent && <p>{parent} alt markası</p>}
               </StatCard>
               <StatCard icon={ShoppingCart} tone='green' label='Satış (adet)' value={fmt.int(now.sales)} delta={before ? change(now.sales, before.sales) : null} />
-              <StatCard icon={PieIcon} tone='violet' label='Pazar payı' value={fmt.pct(market.share)}
-                unit={market.rank ? `${market.rank}. sırada` : undefined}
-                delta={market.share !== null && market.sharePrev !== null ? market.share - market.sharePrev : null} points />
+              {activeCat ? (
+                <StatCard icon={PieIcon} tone='violet' label='Kategori payı' value={fmt.pct(catShare)} unit='firma cirosunda'
+                  delta={catShare !== null && catSharePrev !== null ? catShare - catSharePrev : null} points />
+              ) : (
+                <StatCard icon={PieIcon} tone='violet' label='Pazar payı' value={fmt.pct(market.share)}
+                  unit={market.rank ? `${market.rank}. sırada` : undefined}
+                  delta={market.share !== null && market.sharePrev !== null ? market.share - market.sharePrev : null} points />
+              )}
               <StatCard icon={Package} tone='amber' label='Ürün sayısı' value={fmt.int(now.listings)} delta={before ? change(now.listings, before.listings) : null} />
             </div>
 
             <div className='grid gap-4 lg:grid-cols-5'>
               <Card className='lg:col-span-3'>
-                <CardHeader><CardTitle>Kategorilere göre ciro</CardTitle></CardHeader>
+                <CardHeader><CardTitle>{activeRoot ? `${activeRoot} · alt kategorilere göre ciro` : 'Kategorilere göre ciro'}</CardTitle></CardHeader>
                 <CardContent className='flex-1 ps-0'>
                   <div className='h-full' style={{ minHeight: Math.max(220, cats.length * 36) }}>
                     <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 1, height: 1 }}>
                       <BarChart data={cats} layout='vertical' margin={{ left: 8, right: 16 }} barCategoryGap={6}>
                         <CartesianGrid horizontal={false} strokeOpacity={0.3} />
                         <XAxis type='number' fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => fmt.moneyCompact(v)} />
-                        <YAxis type='category' dataKey='category' width={130} fontSize={12} tickLine={false} axisLine={false} interval={0} />
+                        <YAxis type='category' dataKey='category' width={150} tickFormatter={(v) => (activeRoot && v === activeRoot ? `${v} (genel)` : v)} fontSize={12} tickLine={false} axisLine={false} interval={0} />
                         <Tooltip formatter={(v) => [fmt.money(Number(v)), 'Ciro']} cursor={{ fillOpacity: 0.08 }} />
                         <Bar dataKey='revenue' radius={[0, 4, 4, 0]} maxBarSize={24} className='cursor-pointer'
                           onClick={(d) => pickCat((d as unknown as { category: string }).category)}>
                           {cats.map((c) => (
-                            <Cell key={c.category} fill={colorOf.get(c.category)} fillOpacity={activeCat && activeCat !== c.category ? 0.3 : 1} />
+                            <Cell key={c.category} fill={colorOf.get(c.category)} fillOpacity={dimBar(c.category) ? 0.3 : 1} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -253,7 +309,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
               </Card>
 
               <Card className='lg:col-span-2'>
-                <CardHeader><CardTitle>Kategori payları</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Ana kategori payları</CardTitle></CardHeader>
                 <CardContent className='space-y-4'>
                   <div className='relative h-56'>
                     <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 1, height: 1 }}>
@@ -261,26 +317,25 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                         <Pie data={slices} dataKey='value' nameKey='name' innerRadius='62%' outerRadius='95%' paddingAngle={1}
                           stroke='var(--card)' strokeWidth={2} className='cursor-pointer' onClick={(d) => pickCat(d.name)}>
                           {slices.map((s, i) => (
-                            <Cell key={s.name} fill={colorAt(s.name === OTHER ? SLICES : i)} fillOpacity={activeCat && activeCat !== s.name ? 0.3 : 1} />
+                            <Cell key={s.name} fill={colorAt(i)} fillOpacity={dimRoot(s.name) ? 0.3 : 1} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v, n) => [`${fmt.money(Number(v))} · ${fmt.pct(now.revenue ? Number(v) / now.revenue : null, 0)}`, n]} />
+                        <Tooltip formatter={(v, n) => [`${fmt.money(Number(v))} · ${fmt.pct(firmNow.revenue ? Number(v) / firmNow.revenue : null, 0)}`, n]} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
                       <span className='text-xs text-muted-foreground'>Toplam</span>
-                      <span className='text-lg font-bold tabular-nums'>{fmt.moneyCompact(now.revenue)}</span>
+                      <span className='text-lg font-bold tabular-nums'>{fmt.moneyCompact(firmNow.revenue)}</span>
                     </div>
                   </div>
                   <ul className='space-y-1.5 text-sm'>
                     {slices.map((s, i) => (
                       <li key={s.name}>
-                        <button type='button' onClick={() => pickCat(s.name)} disabled={s.name === OTHER}
-                          className={cn('flex w-full items-center gap-2 rounded px-1 text-start hover:bg-muted disabled:hover:bg-transparent',
-                            activeCat && activeCat !== s.name && 'opacity-40')}>
-                          <span className='size-3 shrink-0 rounded-sm' style={{ background: colorAt(s.name === OTHER ? SLICES : i) }} />
+                        <button type='button' onClick={() => pickCat(s.name)}
+                          className={cn('flex w-full items-center gap-2 rounded px-1 text-start hover:bg-muted', dimRoot(s.name) && 'opacity-40')}>
+                          <span className='size-3 shrink-0 rounded-sm' style={{ background: colorAt(i) }} />
                           <span className='truncate'>{s.name}</span>
-                          <span className='ms-auto font-medium tabular-nums'>{fmt.pct(now.revenue ? s.value / now.revenue : null, 0)}</span>
+                          <span className='ms-auto font-medium tabular-nums'>{fmt.pct(firmNow.revenue ? s.value / firmNow.revenue : null, 0)}</span>
                         </button>
                       </li>
                     ))}
@@ -291,7 +346,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
 
             {brandReports.length > 1 && (
               <Card>
-                <CardHeader><CardTitle>Ciro geçmişi</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Ciro geçmişi{activeCat ? ` · ${activeCat}` : ''}</CardTitle></CardHeader>
                 <CardContent className='h-64 ps-0'>
                   <ResponsiveContainer width='100%' height='100%' initialDimension={{ width: 1, height: 1 }}>
                     <LineChart data={trend}>
@@ -308,10 +363,10 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
 
             <Card>
               <CardHeader className='flex flex-row flex-wrap items-center gap-2'>
-                <CardTitle className='me-auto'>Ürünler</CardTitle>
+                <CardTitle className='me-auto'>Ürünler{activeCat ? ` (${fmt.int(catProducts.length)})` : ''}</CardTitle>
                 {activeCat && (
                   <Button variant='secondary' size='sm' onClick={() => setCategory(undefined)}>
-                    <span className='size-2.5 rounded-sm' style={{ background: colorOf.get(activeCat) }} />
+                    <span className='size-2.5 rounded-sm' style={{ background: colorOf.get(activeCat) ?? 'var(--cat-other)' }} />
                     {activeCat} <X />
                   </Button>
                 )}
@@ -320,6 +375,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className='w-10 text-right'>#</TableHead>
                       <TableHead className='w-12' />
                       <TableHead>Ürün</TableHead>
                       <SortHead label='Fiyat' k='price' sort={sort} onClick={toggleSort} />
@@ -329,11 +385,12 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {top.map((p) => {
+                    {top.map((p, i) => {
                       const o = prevByAsin.get(p.asin)
                       const d = o ? change(p.revenueCalc, o.revenueCalc) : null
                       return (
                         <TableRow key={p.id}>
+                          <TableCell className='text-right text-muted-foreground tabular-nums'>{i + 1}.</TableCell>
                           <TableCell><ProductImage asin={p.asin} url={p.imageUrl} className='size-10 rounded border bg-white' /></TableCell>
                           <TableCell className='max-w-[28rem]'>
                             <Link to='/urun/$asin' params={{ asin: p.asin }} className='block truncate font-medium hover:underline' title={p.title}>{p.title || p.asin}</Link>
@@ -352,10 +409,19 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                       )
                     })}
                     {!top.length && (
-                      <TableRow><TableCell colSpan={prev ? 6 : 5} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={prev ? 7 : 6} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
+                <div className='no-print mt-3 flex items-center justify-center gap-3 text-sm text-muted-foreground'>
+                  <span>{fmt.int(top.length)} / {fmt.int(catProducts.length)} ürün gösteriliyor</span>
+                  {top.length < catProducts.length && (
+                    <>
+                      <Button variant='outline' size='sm' onClick={() => setShown((n) => n + PAGE)}>{PAGE} ürün daha göster</Button>
+                      <Button variant='ghost' size='sm' onClick={() => setShown(catProducts.length)}>Hepsini göster</Button>
+                    </>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
