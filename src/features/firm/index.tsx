@@ -47,11 +47,12 @@ const SORT_VALUE: Record<SortKey, (p: Product) => number | null> = {
 /** İlk tıklamadaki yön: BSR'de küçük olan iyidir, önce azdan çoğa */
 const FIRST_DIR: Partial<Record<SortKey, 'asc'>> = { bsr: 'asc' }
 
-// Ürün tablosu sütun genişlikleri (px); kenarından sürükleyerek değişir, çift tıklayınca sıfırlanır
+// Ürün tablosu sütun genişlikleri (px); kenarından sürükleyerek değişir, çift tıklayınca sıfırlanır.
+// Tablo kartı doldurur: artan yer Product Details sütununa gider (onun genişliği en az değerdir).
 type ColKey = 'num' | 'img' | 'title' | SortKey | 'delta'
-const DEFAULT_W: Record<ColKey, number> = { num: 44, img: 56, title: 260, price: 90, sales: 100, revenue: 120, bsr: 90, rating: 80, delta: 130 }
+const DEFAULT_W: Record<ColKey, number> = { num: 48, img: 60, title: 280, price: 100, sales: 120, revenue: 140, bsr: 100, rating: 100, delta: 150 }
 const MIN_W = 40
-const W_STORE = 'firm-product-col-widths'
+const W_STORE = 'firm-product-col-widths-v2'
 
 function useColumnWidths() {
   const [w, setW] = useState<Record<ColKey, number>>(() => {
@@ -72,7 +73,9 @@ function useColumnWidths() {
     e.preventDefault()
     e.stopPropagation()
     const x0 = e.clientX
-    const w0 = w[k]
+    // Ekrandaki gerçek genişlikten başla (Product Details kartı doldurmak için genişlemiş olabilir)
+    const th = (e.currentTarget as HTMLElement).parentElement
+    const w0 = th ? Math.round(th.getBoundingClientRect().width) : w[k]
     document.body.style.cursor = 'col-resize'
     const move = (ev: PointerEvent) => setW((s) => ({ ...s, [k]: Math.max(MIN_W, Math.round(w0 + ev.clientX - x0)) }))
     const up = () => {
@@ -443,8 +446,8 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                 )}
               </CardHeader>
               <CardContent>
-                <Table className='table-fixed' style={{ width: colKeys.reduce((s, k) => s + cols.w[k], 0) }}>
-                  <colgroup>{colKeys.map((k) => <col key={k} style={{ width: cols.w[k] }} />)}</colgroup>
+                <Table className='table-fixed' style={{ width: '100%', minWidth: colKeys.reduce((s, k) => s + cols.w[k], 0) }}>
+                  <colgroup>{colKeys.map((k) => <col key={k} style={k === 'title' ? undefined : { width: cols.w[k] }} />)}</colgroup>
                   <TableHeader>
                     <TableRow>
                       <ResizableHead k='num' cols={cols} className='text-right'>#</ResizableHead>
