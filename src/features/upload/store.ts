@@ -1,7 +1,7 @@
 import type { BrandAlias } from '@/core/brands'
 import type { DraftProduct, ParsedSheet } from '@/core/clean'
 import { db, getSettings } from '@/data/db'
-import { loadCategoryMap } from '@/data/repo'
+import { applyBrandOverrides, getBrandOverrides, loadCategoryMap } from '@/data/repo'
 import { create } from 'zustand'
 import type { PickedFile } from '@/lib/platform'
 
@@ -147,6 +147,7 @@ async function readFiles(
 ): Promise<number> {
   const settings = await getSettings()
   const categories = await loadCategoryMap()
+  const brandOverrides = await getBrandOverrides()
   const known = new Set(get().drafts.map((d) => d.id))
   const drafts: Draft[] = []
   const skipped: ParsedSheet[] = []
@@ -180,6 +181,8 @@ async function readFiles(
           importedAt: r.importedAt,
           exact: r.fileHash === fileHash,
         }))
+        // Kategoriler sayfasında ASIN'e elle verilen marka, dosyadakinin yerine geçer
+        s.products = applyBrandOverrides(s.products, brandOverrides)
         for (const d of splitByCompany(s)) {
           if (known.has(d.id)) continue
           // Daha önce yüklenen dosya varsayılan olarak kaydedilmez; kullanıcı isterse işaretler

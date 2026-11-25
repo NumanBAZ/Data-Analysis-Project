@@ -8,12 +8,14 @@ import { fold } from '@/core/text'
 import { db } from '@/data/db'
 import { ProductImage } from '@/components/product-image'
 import { CategorySelect } from '@/components/category-select'
-import { restoreCategory, setCategories, setCategory } from '@/data/repo'
+import { restoreAsinBrand, restoreCategory, setAsinBrand, setCategories, setCategory } from '@/data/repo'
+import { KNOWN_BRANDS } from '@/core/brands'
 import { CONFIDENT, suggestCategory, trainCategoryModel, type Suggestion } from '@/core/suggest'
 import { fmt } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfigDrawer } from '@/components/config-drawer'
@@ -68,6 +70,12 @@ export function Categories() {
     for (const r of list) if (r.category === UNDEFINED_CATEGORY) r.suggestion = suggestCategory(model, r.title)
     return list
   })
+  const reportBrands = useLiveQuery(async () => (await db.reports.toArray()).map((r) => r.brand))
+  const brands = useMemo(
+    () => [...new Set([...KNOWN_BRANDS, ...(reportBrands ?? []), ...(rows ?? []).map((r) => r.brand)].filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'tr')),
+    [reportBrands, rows],
+  )
   const confident = (rows ?? []).filter((r) => r.category === UNDEFINED_CATEGORY && (r.suggestion?.confidence ?? 0) >= CONFIDENT)
   const acceptAll = async () => {
     if (!window.confirm(`${confident.length} ürün için emin olunan öneriler kaydedilsin mi?`)) return
@@ -103,7 +111,7 @@ export function Categories() {
           <h2 className='text-2xl font-bold tracking-tight'>Kategoriler</h2>
           <p className='text-muted-foreground'>
             Kategorisi bilinmeyen ürünlere kategori verin. Atama ASIN'e kaydedilir; o ASIN eski ve yeni bütün raporlarda bu kategoriyle görünür.
-            Listeden seçtiğiniz kategori anında kaydedilir; yanlış seçerseniz çıkan bildirimdeki "Geri al"a basın. Öneriler, "kabul et"e basmadıkça kaydedilmez.
+            Marka da buradan değiştirilebilir (bütün raporlarda ve sonraki yüklemelerde geçerli olur). Listeden seçtiğiniz kategori ve marka anında kaydedilir; yanlış seçerseniz çıkan bildirimdeki "Geri al"a basın. Öneriler, "kabul et"e basmadıkça kaydedilmez.
           </p>
         </div>
 
@@ -134,7 +142,7 @@ export function Categories() {
               <TableRow>
                 <TableHead className='w-28 min-w-28' />
                 <TableHead>Product Details</TableHead>
-                <TableHead className='w-40 text-center'>Brand</TableHead>
+                <TableHead className='w-48 text-center'>Brand</TableHead>
                 <TableHead className='w-72'>Category</TableHead>
               </TableRow>
             </TableHeader>
@@ -146,7 +154,7 @@ export function Categories() {
                   </TableCell>
                 </TableRow>
               )}
-              {visible.slice(0, PAGE).map((r) => <CategoryRow key={r.asin} row={r} />)}
+              {visible.slice(0, PAGE).map((r) => <CategoryRow key={r.asin} row={r} brands={brands} />)}
             </TableBody>
           </Table>
         </div>
@@ -158,7 +166,7 @@ export function Categories() {
   )
 }
 
-function CategoryRow({ row }: { row: AsinRow }) {
+function CategoryRow({ row, brands }: { row: AsinRow; brands: string[] }) {
   const saved = row.category === UNDEFINED_CATEGORY ? '' : row.category
   const [busy, setBusy] = useState(false)
 
@@ -184,6 +192,22 @@ function CategoryRow({ row }: { row: AsinRow }) {
   }
   const suggestion = !saved ? row.suggestion : undefined
 
+  const saveBrand = async (brand: string) => {
+    if (!brand || brand === row.brand || busy) return
+    setBusy(true)
+    try {
+      const before = await setAsinBrand(row.asin, brand)
+      toast.success(`Marka değişti: ${row.brand || '–'} → ${brand}`, {
+        description: row.title.slice(0, 80),
+        action: { label: 'Geri al', onClick: () => void restoreAsinBrand(before).then(() => toast.info('Geri alındı.')) },
+      })
+    } catch (e) {
+      toast.error('Kaydedilemedi: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <TableRow>
       <TableCell>
@@ -198,7 +222,16 @@ function CategoryRow({ row }: { row: AsinRow }) {
           </Badge>
         )}
       </TableCell>
-      <TableCell className='text-center'><BrandBadge brand={row.brand} /></TableCell>
+      <TableCell className='text-center'>
+        <Select value={row.brand || undefined} onValueChange={(v) => void saveBrand(v)} disabled={busy}>
+          <SelectTrigger className='mx-auto h-8 w-40 justify-center gap-1 border-dashed' title='Markayı değiştir (seçince kaydedilir)'>
+            {row.brand ? <BrandBadge brand={row.brand} /> : <span className='text-muted-foreground'>Marka seçin</span>}
+          </SelectTrigger>
+          <SelectContent className='max-h-80'>
+            {brands.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </TableCell>
       <TableCell>
         <div className='space-y-1.5'>
           <CategorySelect value={saved} onChange={(v) => void save(v)} placeholder='Kategori seçin (seçince kaydedilir)' />

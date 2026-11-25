@@ -492,3 +492,72 @@ export async function applyTitleCategoryRules(): Promise<{ category: string; asi
   await db.kv.put({ key: 'title-rules', value: [...done, ...todo.map((r) => r.id)] })
   return out
 }
+
+// ---------------------------------------------------------------------------
+// ASIN'e elle marka ataması (Kategoriler sayfasından)
+// ---------------------------------------------------------------------------
+
+const BRAND_OVERRIDES_KEY = 'brand-overrides'
+
+/** ASIN → elle verilen marka; yeni yüklenen dosyalarda da bu marka kullanılır */
+export type BrandOverrides = Record<string, { brand: string; at: string }>
+
+export async function getBrandOverrides(): Promise<BrandOverrides> {
+  return ((await db.kv.get(BRAND_OVERRIDES_KEY))?.value as BrandOverrides | undefined) ?? {}
+}
+
+/** Yüklenen taslak ürünlere elle verilmiş markaları uygular (firmalara ayırmadan önce) */
+export function applyBrandOverrides<T extends Pick<Product, 'asin' | 'brand' | 'brandKey'>>(products: T[], overrides: BrandOverrides): T[] {
+  return products.map((p) => {
+    const o = p.asin ? overrides[p.asin] : undefined
+    return o && o.brand !== p.brand ? { ...p, brand: o.brand, brandKey: brandKey(o.brand) } : p
+  })
+}
+
+/** Geri alma için: değişiklikten önceki hâl */
+export type BrandSnapshot = {
+  asin: string
+  override: { brand: string; at: string } | undefined
+  products: { id: number; brand: string; brandKey: string; edits: Product['edits'] }[]
+}
+
+/**
+ * ASIN'in markasını bütün raporlarda değiştirir ve ASIN'e kaydeder (sonraki yüklemelerde de geçerli).
+ * Eski değer ürünün `edits` kaydında saklanır. Geri almak için dönen kaydı `restoreAsinBrand`a verin.
+ */
+export async function setAsinBrand(asin: string, brand: string): Promise<BrandSnapshot> {
+  const name = brand.trim()
+  if (!asin || !name) throw new Error('Marka boş olamaz.')
+  const key = brandKey(name)
+  const at = new Date().toISOString()
+  return db.transaction('rw', db.products, db.kv, async () => {
+    const overrides = await getBrandOverrides()
+    const products = await db.products.where('asin').equals(asin).toArray()
+    const snapshot: BrandSnapshot = {
+      asin,
+      override: overrides[asin],
+      products: products.map((p) => ({ id: p.id!, brand: p.brand, brandKey: p.brandKey, edits: p.edits })),
+    }
+    for (const p of products) {
+      if (p.brand === name && p.brandKey === key) continue
+      const first = p.edits?.brand
+      await db.products.update(p.id!, {
+        brand: name,
+        brandKey: key,
+        edits: { ...(p.edits ?? {}), brand: first ?? { from: p.brand, at } },
+      })
+    }
+    await db.kv.put({ key: BRAND_OVERRIDES_KEY, value: { ...overrides, [asin]: { brand: name, at } } })
+    return snapshot
+  })
+}
+
+export async function restoreAsinBrand(s: BrandSnapshot) {
+  await db.transaction('rw', db.products, db.kv, async () => {
+    for (const p of s.products) await db.products.update(p.id, { brand: p.brand, brandKey: p.brandKey, edits: p.edits })
+    const overrides = await getBrandOverrides()
+    if (s.override) overrides[s.asin] = s.override
+    else delete overrides[s.asin]
+    await db.kv.put({ key: BRAND_OVERRIDES_KEY, value: overrides })
+  })
+}
