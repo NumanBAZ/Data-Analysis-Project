@@ -6,6 +6,7 @@ import {
   DatabaseBackup,
   LayoutDashboard,
   ChartPie,
+  PackageSearch,
   Settings,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -24,6 +25,11 @@ export const sidebarData: SidebarData = {
           title: 'Firma Analizi',
           url: '/firma',
           icon: ChartPie,
+        },
+        {
+          title: 'Ürün Analizi',
+          url: '/urun-analizi',
+          icon: PackageSearch,
         },
         {
           title: 'Dosya Yükle',

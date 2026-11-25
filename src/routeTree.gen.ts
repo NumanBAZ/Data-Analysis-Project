@@ -15,6 +15,7 @@ import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
 import { Route as AuthenticatedYukleIndexRouteImport } from './routes/_authenticated/yukle/index'
 import { Route as AuthenticatedYedekIndexRouteImport } from './routes/_authenticated/yedek/index'
+import { Route as AuthenticatedUrunAnaliziIndexRouteImport } from './routes/_authenticated/urun-analizi/index'
 import { Route as AuthenticatedRaporlarIndexRouteImport } from './routes/_authenticated/raporlar/index'
 import { Route as AuthenticatedKategorilerIndexRouteImport } from './routes/_authenticated/kategoriler/index'
 import { Route as AuthenticatedKarsilastirIndexRouteImport } from './routes/_authenticated/karsilastir/index'
@@ -52,6 +53,12 @@ const AuthenticatedYedekIndexRoute = AuthenticatedYedekIndexRouteImport.update({
   path: '/yedek/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedUrunAnaliziIndexRoute =
+  AuthenticatedUrunAnaliziIndexRouteImport.update({
+    id: '/urun-analizi/',
+    path: '/urun-analizi/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRaporlarIndexRoute =
   AuthenticatedRaporlarIndexRouteImport.update({
     id: '/raporlar/',
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/karsilastir/': typeof AuthenticatedKarsilastirIndexRoute
   '/kategoriler/': typeof AuthenticatedKategorilerIndexRoute
   '/raporlar/': typeof AuthenticatedRaporlarIndexRoute
+  '/urun-analizi/': typeof AuthenticatedUrunAnaliziIndexRoute
   '/yedek/': typeof AuthenticatedYedekIndexRoute
   '/yukle/': typeof AuthenticatedYukleIndexRoute
   '/raporlar/$id/': typeof AuthenticatedRaporlarIdIndexRoute
@@ -117,6 +125,7 @@ export interface FileRoutesByTo {
   '/karsilastir': typeof AuthenticatedKarsilastirIndexRoute
   '/kategoriler': typeof AuthenticatedKategorilerIndexRoute
   '/raporlar': typeof AuthenticatedRaporlarIndexRoute
+  '/urun-analizi': typeof AuthenticatedUrunAnaliziIndexRoute
   '/yedek': typeof AuthenticatedYedekIndexRoute
   '/yukle': typeof AuthenticatedYukleIndexRoute
   '/raporlar/$id': typeof AuthenticatedRaporlarIdIndexRoute
@@ -133,6 +142,7 @@ export interface FileRoutesById {
   '/_authenticated/karsilastir/': typeof AuthenticatedKarsilastirIndexRoute
   '/_authenticated/kategoriler/': typeof AuthenticatedKategorilerIndexRoute
   '/_authenticated/raporlar/': typeof AuthenticatedRaporlarIndexRoute
+  '/_authenticated/urun-analizi/': typeof AuthenticatedUrunAnaliziIndexRoute
   '/_authenticated/yedek/': typeof AuthenticatedYedekIndexRoute
   '/_authenticated/yukle/': typeof AuthenticatedYukleIndexRoute
   '/_authenticated/raporlar/$id/': typeof AuthenticatedRaporlarIdIndexRoute
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/karsilastir/'
     | '/kategoriler/'
     | '/raporlar/'
+    | '/urun-analizi/'
     | '/yedek/'
     | '/yukle/'
     | '/raporlar/$id/'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/karsilastir'
     | '/kategoriler'
     | '/raporlar'
+    | '/urun-analizi'
     | '/yedek'
     | '/yukle'
     | '/raporlar/$id'
@@ -178,6 +190,7 @@ export interface FileRouteTypes {
     | '/_authenticated/karsilastir/'
     | '/_authenticated/kategoriler/'
     | '/_authenticated/raporlar/'
+    | '/_authenticated/urun-analizi/'
     | '/_authenticated/yedek/'
     | '/_authenticated/yukle/'
     | '/_authenticated/raporlar/$id/'
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       path: '/yedek'
       fullPath: '/yedek/'
       preLoaderRoute: typeof AuthenticatedYedekIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/urun-analizi/': {
+      id: '/_authenticated/urun-analizi/'
+      path: '/urun-analizi'
+      fullPath: '/urun-analizi/'
+      preLoaderRoute: typeof AuthenticatedUrunAnaliziIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/raporlar/': {
@@ -293,6 +313,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedKarsilastirIndexRoute: typeof AuthenticatedKarsilastirIndexRoute
   AuthenticatedKategorilerIndexRoute: typeof AuthenticatedKategorilerIndexRoute
   AuthenticatedRaporlarIndexRoute: typeof AuthenticatedRaporlarIndexRoute
+  AuthenticatedUrunAnaliziIndexRoute: typeof AuthenticatedUrunAnaliziIndexRoute
   AuthenticatedYedekIndexRoute: typeof AuthenticatedYedekIndexRoute
   AuthenticatedYukleIndexRoute: typeof AuthenticatedYukleIndexRoute
   AuthenticatedRaporlarIdIndexRoute: typeof AuthenticatedRaporlarIdIndexRoute
@@ -306,6 +327,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedKarsilastirIndexRoute: AuthenticatedKarsilastirIndexRoute,
   AuthenticatedKategorilerIndexRoute: AuthenticatedKategorilerIndexRoute,
   AuthenticatedRaporlarIndexRoute: AuthenticatedRaporlarIndexRoute,
+  AuthenticatedUrunAnaliziIndexRoute: AuthenticatedUrunAnaliziIndexRoute,
   AuthenticatedYedekIndexRoute: AuthenticatedYedekIndexRoute,
   AuthenticatedYukleIndexRoute: AuthenticatedYukleIndexRoute,
   AuthenticatedRaporlarIdIndexRoute: AuthenticatedRaporlarIdIndexRoute,
