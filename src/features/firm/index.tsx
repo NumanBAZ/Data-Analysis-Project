@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Package, PieChart as PieIcon, ShoppingCart, X } from 'lucide-react'
@@ -36,31 +36,96 @@ const colorAt = (i: number) => (i < COLORS ? `var(--cat-${i + 1})` : 'var(--cat-
 /** Ürün tablosunda bir seferde gösterilen satır */
 const PAGE = 50
 
-type SortKey = 'price' | 'sales' | 'revenue'
+type SortKey = 'price' | 'sales' | 'revenue' | 'bsr' | 'rating'
 const SORT_VALUE: Record<SortKey, (p: Product) => number | null> = {
   price: (p) => p.price,
   sales: (p) => p.salesAdjusted,
   revenue: (p) => p.revenueCalc,
+  bsr: (p) => p.bsr,
+  rating: (p) => p.rating,
+}
+/** İlk tıklamadaki yön: BSR'de küçük olan iyidir, önce azdan çoğa */
+const FIRST_DIR: Partial<Record<SortKey, 'asc'>> = { bsr: 'asc' }
+
+// Ürün tablosu sütun genişlikleri (px); kenarından sürükleyerek değişir, çift tıklayınca sıfırlanır
+type ColKey = 'num' | 'img' | 'title' | SortKey | 'delta'
+const DEFAULT_W: Record<ColKey, number> = { num: 44, img: 56, title: 260, price: 90, sales: 84, revenue: 104, bsr: 90, rating: 72, delta: 110 }
+const MIN_W = 40
+const W_STORE = 'firm-product-col-widths'
+
+function useColumnWidths() {
+  const [w, setW] = useState<Record<ColKey, number>>(() => {
+    try {
+      return { ...DEFAULT_W, ...JSON.parse(localStorage.getItem(W_STORE) ?? '{}') }
+    } catch {
+      return DEFAULT_W
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(W_STORE, JSON.stringify(w))
+    } catch {
+      /* kaydedilemezse varsayılan kullanılır */
+    }
+  }, [w])
+  const startResize = (k: ColKey) => (e: ReactPointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const x0 = e.clientX
+    const w0 = w[k]
+    document.body.style.cursor = 'col-resize'
+    const move = (ev: PointerEvent) => setW((s) => ({ ...s, [k]: Math.max(MIN_W, Math.round(w0 + ev.clientX - x0)) }))
+    const up = () => {
+      document.body.style.cursor = ''
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  const reset = (k: ColKey) => setW((s) => ({ ...s, [k]: DEFAULT_W[k] }))
+  return { w, startResize, reset }
+}
+type Widths = ReturnType<typeof useColumnWidths>
+
+/** Sağ kenarında genişlik tutamacı olan başlık */
+function ResizableHead({ k, cols, className, title, children }: {
+  k: ColKey
+  cols: Widths
+  className?: string
+  title?: string
+  children?: ReactNode
+}) {
+  return (
+    <TableHead className={cn('relative overflow-hidden', className)} title={title}>
+      {children}
+      <span role='separator' aria-orientation='vertical' title='Sürükleyerek genişlet · çift tıklayınca sıfırla'
+        onPointerDown={cols.startResize(k)} onDoubleClick={() => cols.reset(k)}
+        style={{ cursor: 'col-resize' }}
+        className='no-print absolute inset-y-1 right-0 w-1.5 rounded bg-border hover:bg-primary/40 active:bg-primary/60' />
+    </TableHead>
+  )
 }
 
 /** Tıklanınca sıralayan tablo başlığı; ok yönü sıralama yönünü gösterir */
-function SortHead({ label, k, sort, onClick }: {
+function SortHead({ label, k, sort, onClick, cols }: {
   label: string
   k: SortKey
   sort: { key: SortKey; dir: 'desc' | 'asc' }
   onClick: (k: SortKey) => void
+  cols: Widths
 }) {
   const active = sort.key === k
   const Icon = !active ? ArrowUpDown : sort.dir === 'desc' ? ArrowDown : ArrowUp
   return (
-    <TableHead className='text-right'>
+    <ResizableHead k={k} cols={cols} className='text-right'>
       <button type='button' onClick={() => onClick(k)}
         title={active && sort.dir === 'desc' ? 'Azdan çoğa sırala' : 'Çoktan aza sırala'}
         className={cn('inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted', active ? 'text-foreground' : 'text-muted-foreground')}>
         {label}
         <Icon className='size-3.5' />
       </button>
-    </TableHead>
+    </ResizableHead>
   )
 }
 
@@ -178,7 +243,9 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
   const [shown, setShown] = useState(PAGE)
   const [sort, setSort] = useState<{ key: SortKey; dir: 'desc' | 'asc' }>({ key: 'revenue', dir: 'desc' })
   const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }))
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: FIRST_DIR[key] ?? 'desc' }))
+  const cols = useColumnWidths()
+  const colKeys: ColKey[] = ['num', 'img', 'title', 'price', 'sales', 'revenue', 'bsr', 'rating', ...(prev ? (['delta'] as const) : [])]
   const top = useMemo(() => {
     const v = SORT_VALUE[sort.key]
     const sign = sort.dir === 'desc' ? -1 : 1
@@ -372,16 +439,19 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                 )}
               </CardHeader>
               <CardContent>
-                <Table>
+                <Table className='table-fixed' style={{ width: colKeys.reduce((s, k) => s + cols.w[k], 0) }}>
+                  <colgroup>{colKeys.map((k) => <col key={k} style={{ width: cols.w[k] }} />)}</colgroup>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className='w-10 text-right'>#</TableHead>
-                      <TableHead className='w-12' />
-                      <TableHead>Ürün</TableHead>
-                      <SortHead label='Fiyat' k='price' sort={sort} onClick={toggleSort} />
-                      <SortHead label='Satış' k='sales' sort={sort} onClick={toggleSort} />
-                      <SortHead label='Ciro' k='revenue' sort={sort} onClick={toggleSort} />
-                      {prev && <TableHead className='text-right' title={`${formatDateTR(prev.date)} raporuna göre ciro değişimi`}>Ciro değişimi</TableHead>}
+                      <ResizableHead k='num' cols={cols} className='text-right'>#</ResizableHead>
+                      <ResizableHead k='img' cols={cols} />
+                      <ResizableHead k='title' cols={cols}>Ürün</ResizableHead>
+                      <SortHead label='Fiyat' k='price' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='Satış' k='sales' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='Ciro' k='revenue' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='BSR' k='bsr' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='Puan' k='rating' sort={sort} onClick={toggleSort} cols={cols} />
+                      {prev && <ResizableHead k='delta' cols={cols} className='text-right' title={`${formatDateTR(prev.date)} raporuna göre ciro değişimi`}>Ciro değişimi</ResizableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -392,13 +462,15 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                         <TableRow key={p.id}>
                           <TableCell className='text-right text-muted-foreground tabular-nums'>{i + 1}.</TableCell>
                           <TableCell><ProductImage asin={p.asin} url={p.imageUrl} className='size-10 rounded border bg-white' /></TableCell>
-                          <TableCell className='max-w-[28rem]'>
-                            <Link to='/urun/$asin' params={{ asin: p.asin }} className='block truncate font-medium hover:underline' title={p.title}>{p.title || p.asin}</Link>
-                            <span className='text-xs text-muted-foreground'>{p.category}</span>
+                          <TableCell className='overflow-hidden'>
+                            <Link to='/urun/$asin' params={{ asin: p.asin }} className='block truncate text-[13px] font-medium hover:underline' title={p.title}>{p.title || p.asin}</Link>
+                            <span className='block truncate text-xs text-muted-foreground'>{p.category}</span>
                           </TableCell>
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'price' && 'font-medium')}>{fmt.money2(p.price)}</TableCell>
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'sales' && 'font-medium')}>{fmt.int(p.salesAdjusted)}</TableCell>
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'revenue' && 'font-medium')}>{fmt.money(p.revenueCalc)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums', sort.key === 'bsr' && 'font-medium')}>{fmt.int(p.bsr)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums', sort.key === 'rating' && 'font-medium')}>{fmt.dec(p.rating)}</TableCell>
                           {prev && (
                             <TableCell className={cn('text-right tabular-nums',
                               d === null ? 'text-muted-foreground' : d >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
@@ -409,7 +481,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                       )
                     })}
                     {!top.length && (
-                      <TableRow><TableCell colSpan={prev ? 7 : 6} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={colKeys.length} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
