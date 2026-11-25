@@ -226,10 +226,10 @@ export function Dashboard() {
                     <TableRow>
                       <TableHead className='w-8' />
                       <TableHead className='w-12' />
-                      <TableHead>Ürün</TableHead>
+                      <TableHead>Product Details</TableHead>
                       <TableHead>Firma</TableHead>
-                      <TableHead className='text-right'>Satış</TableHead>
-                      <TableHead className='text-right'>Ciro</TableHead>
+                      <TableHead className='text-right'>ASIN Sales</TableHead>
+                      <TableHead className='text-right'>ASIN Revenue</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

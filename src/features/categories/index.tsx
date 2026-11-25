@@ -133,9 +133,9 @@ export function Categories() {
             <TableHeader>
               <TableRow>
                 <TableHead className='w-28 min-w-28' />
-                <TableHead>Ürün</TableHead>
-                <TableHead className='w-40 text-center'>Marka</TableHead>
-                <TableHead className='w-72'>Kategori</TableHead>
+                <TableHead>Product Details</TableHead>
+                <TableHead className='w-40 text-center'>Brand</TableHead>
+                <TableHead className='w-72'>Category</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

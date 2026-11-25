@@ -14,6 +14,13 @@ export const fmt = {
   compact: (n: number | null | undefined) => (n == null ? '–' : compact.format(n)),
   pct: (n: number | null | undefined, digits = 1) =>
     n == null || !Number.isFinite(n) ? '–' : `${(n * 100).toFixed(digits)}%`,
+  /** Pay yüzdesi: tam sayı; %1'in altı ondalıklı (0.3%), çok küçükse <0.1%; yalnız gerçekten 0 ise 0% */
+  share: (n: number | null | undefined) => {
+    if (n == null || !Number.isFinite(n)) return '–'
+    if (n <= 0) return '0%'
+    if (n < 0.001) return '<0.1%'
+    return n < 0.01 ? `${(n * 100).toFixed(1)}%` : `${(n * 100).toFixed(0)}%`
+  },
   /** +12.4% / −3.1% */
   delta: (n: number | null | undefined) =>
     n == null || !Number.isFinite(n) ? '–' : `${n >= 0 ? '+' : '−'}${Math.abs(n * 100).toFixed(1)}%`,

@@ -135,21 +135,21 @@ export async function buildSummaryWorkbook(reports: Report[], productsByReport: 
 // ---------------------------------------------------------------------------
 
 export const PRODUCT_COLS: { label: string; width: number; kind: Kind; get: (p: Product) => V }[] = [
-  { label: 'Sıra', width: 7, kind: 'text', get: (p) => p.displayOrder },
+  { label: 'Display Order', width: 9, kind: 'text', get: (p) => p.displayOrder },
   { label: 'ASIN', width: 13, kind: 'text', get: (p) => p.asin },
-  { label: 'Ürün', width: 60, kind: 'text', get: (p) => p.title },
-  { label: 'Marka', width: 16, kind: 'text', get: (p) => p.brand },
-  { label: 'Kategori', width: 18, kind: 'text', get: (p) => p.category },
-  { label: 'Fiyat', width: 10, kind: 'money', get: (p) => p.price },
-  { label: 'Satış (ham)', width: 11, kind: 'int', get: (p) => p.sales },
-  { label: 'Satış', width: 10, kind: 'int', get: (p) => p.salesAdjusted },
-  { label: 'Ciro', width: 14, kind: 'money', get: (p) => p.revenueCalc },
+  { label: 'Product Details', width: 60, kind: 'text', get: (p) => p.title },
+  { label: 'Brand', width: 16, kind: 'text', get: (p) => p.brand },
+  { label: 'Category', width: 18, kind: 'text', get: (p) => p.category },
+  { label: 'Price', width: 10, kind: 'money', get: (p) => p.price },
+  { label: 'ASIN Sales (raw)', width: 14, kind: 'int', get: (p) => p.sales },
+  { label: 'ASIN Sales', width: 11, kind: 'int', get: (p) => p.salesAdjusted },
+  { label: 'ASIN Revenue', width: 14, kind: 'money', get: (p) => p.revenueCalc },
   { label: 'Kural', width: 7, kind: 'text', get: (p) => (p.ruleApplied ? 'Evet' : '') },
   { label: 'Elle', width: 7, kind: 'text', get: (p) => (p.edits ? 'Evet' : '') },
   { label: 'BSR', width: 10, kind: 'int', get: (p) => p.bsr },
-  { label: 'Yorum', width: 9, kind: 'int', get: (p) => p.reviews },
-  { label: 'Puan', width: 6, kind: 'dec', get: (p) => p.rating },
-  { label: 'Satıcı', width: 20, kind: 'text', get: (p) => p.seller },
+  { label: 'Reviews', width: 9, kind: 'int', get: (p) => p.reviews },
+  { label: 'Rating', width: 7, kind: 'dec', get: (p) => p.rating },
+  { label: 'Seller', width: 20, kind: 'text', get: (p) => p.seller },
   { label: 'URL', width: 40, kind: 'text', get: (p) => p.url },
 ]
 
@@ -159,7 +159,7 @@ function addProductSheet(wb: ExcelJS.Workbook, name: string, products: Product[]
   const sorted = [...products].sort((a, b) => b.revenueCalc - a.revenueCalc)
   const rows: V[][] = sorted.map((p) => [null, ...PRODUCT_COLS.map((c) => c.get(p))])
   const t = sorted.reduce((a, p) => ({ rev: a.rev + (p.revenueCalc || 0), sales: a.sales + (p.salesAdjusted || 0) }), { rev: 0, sales: 0 })
-  rows.push([null, ...PRODUCT_COLS.map((c) => (c.label === 'Ürün' ? 'TOPLAM' : c.label === 'Satış' ? t.sales : c.label === 'Ciro' ? t.rev : null))])
+  rows.push([null, ...PRODUCT_COLS.map((c) => (c.label === 'Product Details' ? 'TOPLAM' : c.label === 'ASIN Sales' ? t.sales : c.label === 'ASIN Revenue' ? t.rev : null))])
 
   const ws = addTable(wb, name, ['Görsel', ...PRODUCT_COLS.map((c) => c.label)], rows, {
     widths: [10, ...PRODUCT_COLS.map((c) => c.width)],

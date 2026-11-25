@@ -467,10 +467,10 @@ function TopList({ tag, color, side, products }: { tag: string; color: string; s
             <TableHeader>
               <TableRow>
                 <TableHead className='w-16' />
-                <TableHead>Ürün</TableHead>
-                <TableHead className='text-right'>Fiyat</TableHead>
-                <TableHead className='text-right'>Satış</TableHead>
-                <TableHead className='text-right'>Ciro</TableHead>
+                <TableHead>Product Details</TableHead>
+                <TableHead className='text-right'>Price</TableHead>
+                <TableHead className='text-right'>ASIN Sales</TableHead>
+                <TableHead className='text-right'>ASIN Revenue</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -506,10 +506,10 @@ function PairTable({ rows }: { rows: Pair[] }) {
         <TableHeader>
           <TableRow>
             <TableHead className='w-28 min-w-28' />
-            <TableHead>Ürün</TableHead>
-            <TableHead className='text-right'>Fiyat</TableHead>
-            <TableHead className='text-right'>Satış</TableHead>
-            <TableHead className='text-right'>Ciro</TableHead>
+            <TableHead>Product Details</TableHead>
+            <TableHead className='text-right'>Price</TableHead>
+            <TableHead className='text-right'>ASIN Sales</TableHead>
+            <TableHead className='text-right'>ASIN Revenue</TableHead>
             <TableHead className='text-right'>Fark</TableHead>
           </TableRow>
         </TableHeader>

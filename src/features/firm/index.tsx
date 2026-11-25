@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDown, ArrowUp, ArrowUpDown, DollarSign, Package, PieChart as PieIcon, ShoppingCart, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarRange, DollarSign, Package, PieChart as PieIcon, ShoppingCart, X } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { brandKey, groupRevenue, parentOf } from '@/core/brands'
 import { formatDateTR, shortDateTR } from '@/core/dates'
@@ -49,7 +49,7 @@ const FIRST_DIR: Partial<Record<SortKey, 'asc'>> = { bsr: 'asc' }
 
 // Ürün tablosu sütun genişlikleri (px); kenarından sürükleyerek değişir, çift tıklayınca sıfırlanır
 type ColKey = 'num' | 'img' | 'title' | SortKey | 'delta'
-const DEFAULT_W: Record<ColKey, number> = { num: 44, img: 56, title: 260, price: 90, sales: 84, revenue: 104, bsr: 90, rating: 72, delta: 110 }
+const DEFAULT_W: Record<ColKey, number> = { num: 44, img: 56, title: 260, price: 90, sales: 100, revenue: 120, bsr: 90, rating: 80, delta: 130 }
 const MIN_W = 40
 const W_STORE = 'firm-product-col-widths'
 
@@ -334,11 +334,15 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
           <p className='text-sm text-muted-foreground'>Yükleniyor…</p>
         ) : (
           <>
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'>
               <StatCard icon={DollarSign} tone='blue' label={activeCat ? `${activeCat} cirosu` : 'Ciro'} value={fmt.money(now.revenue)} delta={before ? change(now.revenue, before.revenue) : null}>
                 {activeCat && <p>Firma cirosu: <span className='font-medium text-foreground'>{fmt.money(firmNow.revenue)}</span></p>}
                 {!activeCat && group && <p>Grup cirosu ({group.subs.join(', ')} dahil): <span className='font-medium text-foreground'>{fmt.money(group.total)}</span></p>}
                 {!activeCat && parent && <p>{parent} alt markası</p>}
+              </StatCard>
+              <StatCard icon={CalendarRange} tone='blue' label={activeCat ? `${activeCat} · yıllık ciro` : 'Yıllık ciro'}
+                value={fmt.money(now.revenue * 12)} unit='tahmini' delta={before ? change(now.revenue, before.revenue) : null}>
+                <p>Aylık ciro × 12 (Helium 10 verisi aylıktır)</p>
               </StatCard>
               <StatCard icon={ShoppingCart} tone='green' label='Satış (adet)' value={fmt.int(now.sales)} delta={before ? change(now.sales, before.sales) : null} />
               {activeCat ? (
@@ -387,7 +391,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                             <Cell key={s.name} fill={colorAt(i)} fillOpacity={dimRoot(s.name) ? 0.3 : 1} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v, n) => [`${fmt.money(Number(v))} · ${fmt.pct(firmNow.revenue ? Number(v) / firmNow.revenue : null, 0)}`, n]} />
+                        <Tooltip formatter={(v, n) => [`${fmt.money(Number(v))} · ${fmt.share(firmNow.revenue ? Number(v) / firmNow.revenue : null)}`, n]} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
@@ -402,7 +406,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                           className={cn('flex w-full items-center gap-2 rounded px-1 text-start hover:bg-muted', dimRoot(s.name) && 'opacity-40')}>
                           <span className='size-3 shrink-0 rounded-sm' style={{ background: colorAt(i) }} />
                           <span className='truncate'>{s.name}</span>
-                          <span className='ms-auto font-medium tabular-nums'>{fmt.pct(firmNow.revenue ? s.value / firmNow.revenue : null, 0)}</span>
+                          <span className='ms-auto font-medium tabular-nums'>{fmt.share(firmNow.revenue ? s.value / firmNow.revenue : null)}</span>
                         </button>
                       </li>
                     ))}
@@ -445,13 +449,13 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                     <TableRow>
                       <ResizableHead k='num' cols={cols} className='text-right'>#</ResizableHead>
                       <ResizableHead k='img' cols={cols} />
-                      <ResizableHead k='title' cols={cols}>Ürün</ResizableHead>
-                      <SortHead label='Fiyat' k='price' sort={sort} onClick={toggleSort} cols={cols} />
-                      <SortHead label='Satış' k='sales' sort={sort} onClick={toggleSort} cols={cols} />
-                      <SortHead label='Ciro' k='revenue' sort={sort} onClick={toggleSort} cols={cols} />
+                      <ResizableHead k='title' cols={cols}>Product Details</ResizableHead>
+                      <SortHead label='Price' k='price' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='ASIN Sales' k='sales' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='ASIN Revenue' k='revenue' sort={sort} onClick={toggleSort} cols={cols} />
                       <SortHead label='BSR' k='bsr' sort={sort} onClick={toggleSort} cols={cols} />
-                      <SortHead label='Puan' k='rating' sort={sort} onClick={toggleSort} cols={cols} />
-                      {prev && <ResizableHead k='delta' cols={cols} className='text-right' title={`${formatDateTR(prev.date)} raporuna göre ciro değişimi`}>Ciro değişimi</ResizableHead>}
+                      <SortHead label='Rating' k='rating' sort={sort} onClick={toggleSort} cols={cols} />
+                      {prev && <ResizableHead k='delta' cols={cols} className='text-right' title={`${formatDateTR(prev.date)} raporuna göre ciro değişimi`}>Revenue Change</ResizableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>

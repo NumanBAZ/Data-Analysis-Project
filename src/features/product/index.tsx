@@ -101,12 +101,12 @@ export function ProductDetail({ asin }: { asin: string }) {
                     <TableRow>
                       <TableHead>Tarih</TableHead>
                       <TableHead>Rapor</TableHead>
-                      <TableHead className='text-right'>Fiyat</TableHead>
-                      <TableHead className='text-right'>Satış</TableHead>
-                      <TableHead className='text-right'>Ciro</TableHead>
+                      <TableHead className='text-right'>Price</TableHead>
+                      <TableHead className='text-right'>ASIN Sales</TableHead>
+                      <TableHead className='text-right'>ASIN Revenue</TableHead>
                       <TableHead className='text-right'>BSR</TableHead>
-                      <TableHead className='text-right'>Yorum</TableHead>
-                      <TableHead className='text-right'>Puan</TableHead>
+                      <TableHead className='text-right'>Reviews</TableHead>
+                      <TableHead className='text-right'>Rating</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

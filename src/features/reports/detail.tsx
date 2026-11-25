@@ -40,15 +40,15 @@ type Col = {
 
 // Hizalama kuralı: yazılar sola, sayılar sağa (başlık ve hücre aynı)
 const COLS: Col[] = [
-  { field: 'title', label: 'Ürün', kind: 'text', width: 'w-64 max-w-64' },
-  { field: 'brand', label: 'Marka', kind: 'text', width: 'w-32 max-w-32' },
-  { field: 'category', label: 'Kategori', kind: 'text', width: 'w-36 max-w-36' },
-  { field: 'price', label: 'Fiyat', kind: 'money', width: 'w-24' },
-  { field: 'salesAdjusted', label: 'Satış', kind: 'int', width: 'w-20' },
+  { field: 'title', label: 'Product Details', kind: 'text', width: 'w-64 max-w-64' },
+  { field: 'brand', label: 'Brand', kind: 'text', width: 'w-32 max-w-32' },
+  { field: 'category', label: 'Category', kind: 'text', width: 'w-36 max-w-36' },
+  { field: 'price', label: 'Price', kind: 'money', width: 'w-24' },
+  { field: 'salesAdjusted', label: 'ASIN Sales', kind: 'int', width: 'w-24' },
   { field: 'bsr', label: 'BSR', kind: 'int', width: 'w-24' },
-  { field: 'reviews', label: 'Yorum', kind: 'int', width: 'w-20' },
-  { field: 'rating', label: 'Puan', kind: 'dec', width: 'w-16' },
-  { field: 'seller', label: 'Satıcı', kind: 'text', width: 'w-36 max-w-36' },
+  { field: 'reviews', label: 'Reviews', kind: 'int', width: 'w-20' },
+  { field: 'rating', label: 'Rating', kind: 'dec', width: 'w-20' },
+  { field: 'seller', label: 'Seller', kind: 'text', width: 'w-36 max-w-36' },
 ]
 const align = (c: Col) => (c.field === 'brand' ? 'text-center' : c.kind === 'text' ? 'text-left' : 'text-right')
 
@@ -196,7 +196,7 @@ export function ReportDetail({ id }: { id: number }) {
                 <TableHead className='w-14 text-left'>Sıra</TableHead>
                 <TableHead className='w-28 text-left'>ASIN</TableHead>
                 {COLS.map((c) => <TableHead key={c.field} className={cn(c.width, align(c))}>{c.label}</TableHead>)}
-                <TableHead className='w-28 text-right'>Ciro</TableHead>
+                <TableHead className='w-32 text-right'>ASIN Revenue</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
