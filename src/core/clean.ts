@@ -53,7 +53,7 @@ const HEADER_SCAN_ROWS = 30
 
 const NUMERIC_FIELDS = [
   'price', 'parentSales', 'sales', 'recentPurchases', 'parentRevenue', 'revenue',
-  'parentTrend', 'asinTrend', 'bsr', 'fees', 'fbaSellers', 'fbmSellers', 'activeSellers',
+  'parentTrend', 'asinTrend', 'bsr', 'stock', 'fees', 'fbaSellers', 'fbmSellers', 'activeSellers',
   'weight', 'salesRankPct', 'reviews', 'rating', 'variationCount', 'sellerAge',
   'titleCharCount', 'imageCount', 'reviewVelocity',
 ] as const satisfies readonly ProductField[]

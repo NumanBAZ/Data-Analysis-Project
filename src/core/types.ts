@@ -35,6 +35,8 @@ export type Product = {
   parentTrend: number | null
   asinTrend: number | null
   bsr: number | null
+  /** Stok adedi. Raporda stok sütunu yoksa null: "bilgi yok" demektir, 0 = stok yok. Eski kayıtlarda alan hiç olmayabilir. */
+  stock?: number | null
   fees: number | null
   fba: string
   fbm: string

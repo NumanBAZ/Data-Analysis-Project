@@ -45,7 +45,7 @@ type Row = {
   score: number
 }
 
-type SortKey = 'score' | 'price' | 'sales' | 'revenue' | 'reviews' | 'rating' | 'bsr'
+type SortKey = 'score' | 'price' | 'sales' | 'revenue' | 'reviews' | 'rating' | 'bsr' | 'stock'
 const SORT_VALUE: Record<SortKey, (r: Row) => number | null> = {
   score: (r) => r.score,
   price: (r) => r.p.price,
@@ -54,6 +54,7 @@ const SORT_VALUE: Record<SortKey, (r: Row) => number | null> = {
   reviews: (r) => r.p.reviews,
   rating: (r) => r.p.rating,
   bsr: (r) => r.p.bsr,
+  stock: (r) => r.p.stock ?? null,
 }
 /** BSR'de küçük olan iyidir */
 const FIRST_DIR: Partial<Record<SortKey, 'asc'>> = { bsr: 'asc' }
@@ -298,6 +299,7 @@ export function ProductAnalysis() {
                       <SortHead label='Reviews' k='reviews' sort={sort} onClick={toggleSort} />
                       <SortHead label='Rating' k='rating' sort={sort} onClick={toggleSort} />
                       <SortHead label='BSR' k='bsr' sort={sort} onClick={toggleSort} />
+                      <SortHead label='Stok' k='stock' sort={sort} onClick={toggleSort} title='– = raporda stok bilgisi yok; 0 = stokta yok' />
                       <TableHead className='text-center'>Bizde</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -306,7 +308,7 @@ export function ProductAnalysis() {
                       <TableRow key={r.p.id}>
                         <TableCell className='text-right text-muted-foreground tabular-nums'>{i + 1}.</TableCell>
                         <TableCell><ProductImage asin={r.p.asin} url={r.p.imageUrl} className='size-10 rounded border bg-white' /></TableCell>
-                        <TableCell className='max-w-[26rem]'>
+                        <TableCell className='max-w-[16rem]'>
                           <Link to='/urun/$asin' params={{ asin: r.p.asin }} className='block truncate text-[13px] font-medium hover:underline' title={r.p.title}>
                             {r.p.title || r.p.asin}
                           </Link>
@@ -320,6 +322,8 @@ export function ProductAnalysis() {
                         <TableCell className={cn('text-right tabular-nums', sort.key === 'reviews' && 'font-medium')}>{fmt.int(r.p.reviews)}</TableCell>
                         <TableCell className={cn('text-right tabular-nums', sort.key === 'rating' && 'font-medium')}>{fmt.dec(r.p.rating)}</TableCell>
                         <TableCell className={cn('text-right tabular-nums', sort.key === 'bsr' && 'font-medium')}>{fmt.int(r.p.bsr)}</TableCell>
+                        <TableCell className={cn('text-right tabular-nums', sort.key === 'stock' && 'font-medium')}
+                          title={r.p.stock == null ? 'Raporda stok bilgisi yok' : undefined}>{fmt.int(r.p.stock)}</TableCell>
                         <TableCell className='text-center'>
                           {r.coverage === 'gap' ? (
                             <Badge variant='destructive' title='Bizim markaların bu kategoride ürünü yok'>Yok</Badge>
@@ -332,7 +336,7 @@ export function ProductAnalysis() {
                       </TableRow>
                     ))}
                     {!top.length && (
-                      <TableRow><TableCell colSpan={12} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={13} className='py-8 text-center text-muted-foreground'>Ürün yok.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>

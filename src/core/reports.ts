@@ -147,6 +147,7 @@ export const PRODUCT_COLS: { label: string; width: number; kind: Kind; get: (p: 
   { label: 'Kural', width: 7, kind: 'text', get: (p) => (p.ruleApplied ? 'Evet' : '') },
   { label: 'Elle', width: 7, kind: 'text', get: (p) => (p.edits ? 'Evet' : '') },
   { label: 'BSR', width: 10, kind: 'int', get: (p) => p.bsr },
+  { label: 'Stok', width: 9, kind: 'int', get: (p) => p.stock ?? null },
   { label: 'Reviews', width: 9, kind: 'int', get: (p) => p.reviews },
   { label: 'Rating', width: 7, kind: 'dec', get: (p) => p.rating },
   { label: 'Seller', width: 20, kind: 'text', get: (p) => p.seller },

@@ -32,6 +32,7 @@ export type ProductField =
   | 'parentTrend'
   | 'asinTrend'
   | 'bsr'
+  | 'stock'
   | 'fees'
   | 'fba'
   | 'fbm'
@@ -77,6 +78,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'parentTrend', label: 'Parent Level Trend', type: 'percent', aliases: ['Parent Level Trend', 'Parent Trend'] },
   { key: 'asinTrend', label: 'ASIN Trend', type: 'percent', aliases: ['ASIN Trend', 'Sales Trend', 'Sales Trend (90 days)'] },
   { key: 'bsr', label: 'BSR', type: 'integer', aliases: ['BSR', 'Best Sellers Rank', 'Sales Rank'] },
+  { key: 'stock', label: 'Stock', type: 'integer', aliases: ['Stock', 'Inventory', 'Stock Level', 'Available Stock', 'Units Available', 'Stok', 'Stok Adedi'] },
   { key: 'fees', label: 'Fees', type: 'money', aliases: ['Fees', 'Fees $', 'Fees US$', 'Fee', 'FBA Fees'] },
   { key: 'fba', label: 'FBA', type: 'text', aliases: ['FBA'] },
   { key: 'fbm', label: 'FBM', type: 'text', aliases: ['FBM'] },
