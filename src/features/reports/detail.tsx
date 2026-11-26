@@ -46,6 +46,7 @@ const COLS: Col[] = [
   { field: 'price', label: 'Price', kind: 'money', width: 'w-24' },
   { field: 'salesAdjusted', label: 'ASIN Sales', kind: 'int', width: 'w-24' },
   { field: 'bsr', label: 'BSR', kind: 'int', width: 'w-24' },
+  { field: 'stock', label: 'Stok', kind: 'int', width: 'w-20' },
   { field: 'reviews', label: 'Reviews', kind: 'int', width: 'w-20' },
   { field: 'rating', label: 'Rating', kind: 'dec', width: 'w-20' },
   { field: 'seller', label: 'Seller', kind: 'text', width: 'w-36 max-w-36' },

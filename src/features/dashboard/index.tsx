@@ -230,6 +230,7 @@ export function Dashboard() {
                       <TableHead>Firma</TableHead>
                       <TableHead className='text-right'>ASIN Sales</TableHead>
                       <TableHead className='text-right'>ASIN Revenue</TableHead>
+                      <TableHead className='text-right'>Stok</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -244,6 +245,7 @@ export function Dashboard() {
                         <TableCell><BrandBadge brand={p.company} /></TableCell>
                         <TableCell className={cn('text-right tabular-nums', topBy === 'sales' && 'font-medium')}>{fmt.int(p.salesAdjusted)}</TableCell>
                         <TableCell className={cn('text-right tabular-nums', topBy === 'revenue' && 'font-medium')}>{fmt.money(p.revenueCalc)}</TableCell>
+                        <TableCell className='text-right tabular-nums' title={p.stock == null ? 'Raporda stok bilgisi yok' : undefined}>{fmt.int(p.stock)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

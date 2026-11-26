@@ -157,7 +157,7 @@ export async function setCategories(items: { asin: string; category: string; bra
 // Elle düzenleme (V4'teki tablo düzenleme karşılığı)
 // ---------------------------------------------------------------------------
 
-export const EDITABLE_FIELDS = ['title', 'brand', 'category', 'price', 'salesAdjusted', 'bsr', 'reviews', 'rating', 'seller'] as const
+export const EDITABLE_FIELDS = ['title', 'brand', 'category', 'price', 'salesAdjusted', 'bsr', 'stock', 'reviews', 'rating', 'seller'] as const
 export type EditableField = (typeof EDITABLE_FIELDS)[number]
 
 /**

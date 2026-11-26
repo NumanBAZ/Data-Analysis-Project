@@ -471,6 +471,7 @@ function TopList({ tag, color, side, products }: { tag: string; color: string; s
                 <TableHead className='text-right'>Price</TableHead>
                 <TableHead className='text-right'>ASIN Sales</TableHead>
                 <TableHead className='text-right'>ASIN Revenue</TableHead>
+                <TableHead className='text-right'>Stok</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -487,6 +488,7 @@ function TopList({ tag, color, side, products }: { tag: string; color: string; s
                     {fmt.money(p.revenueCalc)}
                     <div className='text-xs text-muted-foreground'>{fmt.pct(p.revenueCalc / total, 0)}</div>
                   </TableCell>
+                  <TableCell className='text-right tabular-nums' title={p.stock == null ? 'Raporda stok bilgisi yok' : undefined}>{fmt.int(p.stock)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -510,6 +512,7 @@ function PairTable({ rows }: { rows: Pair[] }) {
             <TableHead className='text-right'>Price</TableHead>
             <TableHead className='text-right'>ASIN Sales</TableHead>
             <TableHead className='text-right'>ASIN Revenue</TableHead>
+            <TableHead className='text-right'>Stok</TableHead>
             <TableHead className='text-right'>Fark</TableHead>
           </TableRow>
         </TableHeader>
@@ -526,6 +529,7 @@ function PairTable({ rows }: { rows: Pair[] }) {
                 <TableCell className='text-right tabular-nums'>{arrow(r.a?.price, r.b?.price, fmt.money2)}</TableCell>
                 <TableCell className='text-right tabular-nums'>{arrow(r.a?.salesAdjusted, r.b?.salesAdjusted, fmt.int)}</TableCell>
                 <TableCell className='text-right tabular-nums'>{arrow(r.a?.revenueCalc, r.b?.revenueCalc, fmt.money)}</TableCell>
+                <TableCell className='text-right tabular-nums'>{arrow(r.a?.stock, r.b?.stock, fmt.int)}</TableCell>
                 <TableCell className={cn('text-right font-medium tabular-nums', tone(r.diff))}>{fmt.money(r.diff)}</TableCell>
               </TableRow>
             )

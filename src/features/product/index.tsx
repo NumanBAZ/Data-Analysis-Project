@@ -76,11 +76,12 @@ export function ProductDetail({ asin }: { asin: string }) {
               </div>
             </div>
 
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-5'>
               <Kpi label='Fiyat' value={fmt.money2(last.p.price)} d={change(last.p.price ?? 0, prev?.p.price)} />
               <Kpi label='Satış (aylık)' value={fmt.int(last.p.salesAdjusted)} d={change(last.p.salesAdjusted ?? 0, prev?.p.salesAdjusted)} />
               <Kpi label='Ciro' value={fmt.money(last.p.revenueCalc)} d={change(last.p.revenueCalc, prev?.p.revenueCalc)} />
               <Kpi label='BSR' value={fmt.int(last.p.bsr)} d={change(last.p.bsr ?? 0, prev?.p.bsr)} invert />
+              <Kpi label='Stok' value={fmt.int(last.p.stock)} d={last.p.stock == null ? null : change(last.p.stock, prev?.p.stock)} />
             </div>
 
             {history!.length > 1 && (
@@ -105,6 +106,7 @@ export function ProductDetail({ asin }: { asin: string }) {
                       <TableHead className='text-right'>ASIN Sales</TableHead>
                       <TableHead className='text-right'>ASIN Revenue</TableHead>
                       <TableHead className='text-right'>BSR</TableHead>
+                      <TableHead className='text-right'>Stok</TableHead>
                       <TableHead className='text-right'>Reviews</TableHead>
                       <TableHead className='text-right'>Rating</TableHead>
                     </TableRow>
@@ -121,6 +123,7 @@ export function ProductDetail({ asin }: { asin: string }) {
                         <TableCell className='text-right tabular-nums'>{fmt.int(p.salesAdjusted)}</TableCell>
                         <TableCell className='text-right tabular-nums'>{fmt.money(p.revenueCalc)}</TableCell>
                         <TableCell className='text-right tabular-nums'>{fmt.int(p.bsr)}</TableCell>
+                        <TableCell className='text-right tabular-nums' title={p.stock == null ? 'Raporda stok bilgisi yok' : undefined}>{fmt.int(p.stock)}</TableCell>
                         <TableCell className='text-right tabular-nums'>{fmt.int(p.reviews)}</TableCell>
                         <TableCell className='text-right tabular-nums'>{fmt.dec(p.rating)}</TableCell>
                       </TableRow>

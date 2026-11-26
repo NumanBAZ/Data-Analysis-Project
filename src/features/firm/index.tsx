@@ -36,12 +36,13 @@ const colorAt = (i: number) => (i < COLORS ? `var(--cat-${i + 1})` : 'var(--cat-
 /** Ürün tablosunda bir seferde gösterilen satır */
 const PAGE = 50
 
-type SortKey = 'price' | 'sales' | 'revenue' | 'bsr' | 'rating'
+type SortKey = 'price' | 'sales' | 'revenue' | 'bsr' | 'stock' | 'rating'
 const SORT_VALUE: Record<SortKey, (p: Product) => number | null> = {
   price: (p) => p.price,
   sales: (p) => p.salesAdjusted,
   revenue: (p) => p.revenueCalc,
   bsr: (p) => p.bsr,
+  stock: (p) => p.stock ?? null,
   rating: (p) => p.rating,
 }
 /** İlk tıklamadaki yön: BSR'de küçük olan iyidir, önce azdan çoğa */
@@ -50,7 +51,7 @@ const FIRST_DIR: Partial<Record<SortKey, 'asc'>> = { bsr: 'asc' }
 // Ürün tablosu sütun genişlikleri (px); kenarından sürükleyerek değişir, çift tıklayınca sıfırlanır.
 // Tablo kartı doldurur: artan yer Product Details sütununa gider (onun genişliği en az değerdir).
 type ColKey = 'num' | 'img' | 'title' | SortKey | 'delta'
-const DEFAULT_W: Record<ColKey, number> = { num: 48, img: 60, title: 280, price: 100, sales: 120, revenue: 140, bsr: 100, rating: 100, delta: 150 }
+const DEFAULT_W: Record<ColKey, number> = { num: 48, img: 60, title: 280, price: 100, sales: 120, revenue: 140, bsr: 100, stock: 90, rating: 100, delta: 150 }
 const MIN_W = 40
 const W_STORE = 'firm-product-col-widths-v2'
 
@@ -248,7 +249,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: FIRST_DIR[key] ?? 'desc' }))
   const cols = useColumnWidths()
-  const colKeys: ColKey[] = ['num', 'img', 'title', 'price', 'sales', 'revenue', 'bsr', 'rating', ...(prev ? (['delta'] as const) : [])]
+  const colKeys: ColKey[] = ['num', 'img', 'title', 'price', 'sales', 'revenue', 'bsr', 'stock', 'rating', ...(prev ? (['delta'] as const) : [])]
   const top = useMemo(() => {
     const v = SORT_VALUE[sort.key]
     const sign = sort.dir === 'desc' ? -1 : 1
@@ -457,6 +458,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                       <SortHead label='ASIN Sales' k='sales' sort={sort} onClick={toggleSort} cols={cols} />
                       <SortHead label='ASIN Revenue' k='revenue' sort={sort} onClick={toggleSort} cols={cols} />
                       <SortHead label='BSR' k='bsr' sort={sort} onClick={toggleSort} cols={cols} />
+                      <SortHead label='Stok' k='stock' sort={sort} onClick={toggleSort} cols={cols} />
                       <SortHead label='Rating' k='rating' sort={sort} onClick={toggleSort} cols={cols} />
                       {prev && <ResizableHead k='delta' cols={cols} className='text-right' title={`${formatDateTR(prev.date)} raporuna göre ciro değişimi`}>Revenue Change</ResizableHead>}
                     </TableRow>
@@ -477,6 +479,7 @@ export function FirmAnalysis({ brand: brandParam }: { brand?: string }) {
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'sales' && 'font-medium')}>{fmt.int(p.salesAdjusted)}</TableCell>
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'revenue' && 'font-medium')}>{fmt.money(p.revenueCalc)}</TableCell>
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'bsr' && 'font-medium')}>{fmt.int(p.bsr)}</TableCell>
+                          <TableCell className={cn('text-right tabular-nums', sort.key === 'stock' && 'font-medium')} title={p.stock == null ? 'Raporda stok bilgisi yok' : undefined}>{fmt.int(p.stock)}</TableCell>
                           <TableCell className={cn('text-right tabular-nums', sort.key === 'rating' && 'font-medium')}>{fmt.dec(p.rating)}</TableCell>
                           {prev && (
                             <TableCell className={cn('text-right tabular-nums',
